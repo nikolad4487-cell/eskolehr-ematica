@@ -30,6 +30,7 @@ const EMATICA_NAV_ITEMS = [
   { id: 'schools', label: 'Škole', icon: Building2 },
   { id: 'years', label: 'Školske godine', icon: CalendarDays },
   { id: 'programs', label: 'Programi', icon: BookOpen },
+  { id: 'subjects', label: 'Predmeti', icon: BookOpen },
   { id: 'classes', label: 'Razredi', icon: School },
   { id: 'students', label: 'Učenici', icon: Users },
   { id: 'users', label: 'Korisnici', icon: UserPlus },
@@ -1048,6 +1049,7 @@ function App() {
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'schools' && <Schools adminScope={adminScope} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'years' && <SchoolYears adminScope={adminScope} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'programs' && <Programs adminScope={adminScope} />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'subjects' && <Subjects adminScope={adminScope} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'classes' && <Classes adminScope={adminScope} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'students' && <Students scopeProfile={profile} isAdmin={isAdmin} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'users' && <StaffDirectory adminScope={adminScope} />}
@@ -3108,6 +3110,15 @@ function StaffDirectory({ adminScope = {} }) {
   );
   const [roleFilter, setRoleFilter] = useSessionState(`${SESSION_PREFIX}:users:role`, 'ALL');
   const [search, setSearch] = useState('');
+  const [editForm, setEditForm] = useState({
+    id: '',
+    school_id: '',
+    name: '',
+    email: '',
+    oib: '',
+    mobile: '',
+  });
+  const [message, setMessage] = useState('');
 
   useEffect(() => {
     if (adminScope.isScoped && schoolId !== adminScope.schoolId) {
@@ -3133,8 +3144,10 @@ function StaffDirectory({ adminScope = {} }) {
         ...profile,
         school_id: row.school_id,
         roles: [],
+        role_records: [],
       };
       if (!current.roles.includes(role)) current.roles.push(role);
+      current.role_records.push({ id: row.id, role });
       merged.set(key, current);
     });
 
@@ -3170,8 +3183,79 @@ function StaffDirectory({ adminScope = {} }) {
     status: 'Aktivan',
   }));
 
+  const startEdit = (profile) => {
+    setMessage('');
+    setEditForm({
+      id: profile.id,
+      school_id: profile.school_id,
+      name: getProfileDisplayName(profile),
+      email: profile.email ?? '',
+      oib: profile.oib ?? '',
+      mobile: profile.mobile ?? profile.phone ?? '',
+    });
+  };
+
+  const saveEdit = async (event) => {
+    event.preventDefault();
+    setMessage('');
+    const email = normalizeLoginEmail(editForm.email);
+    const { error } = await supabase
+      .from('user_profiles')
+      .update({
+        name: editForm.name.trim(),
+        email: email || null,
+        oib: editForm.oib.trim() || null,
+        mobile: editForm.mobile.trim() || null,
+      })
+      .eq('id', editForm.id);
+
+    setMessage(error ? error.message : 'Korisnički podaci su ažurirani.');
+    if (!error) {
+      setEditForm({ id: '', school_id: '', name: '', email: '', oib: '', mobile: '' });
+      roles.reload();
+    }
+  };
+
+  const deleteFromInstitution = async (profile) => {
+    const institutionName = schools.data.find((school) => school.id === profile.school_id)?.name ?? 'odabrane ustanove';
+    const confirmed = window.confirm(
+      `Obrisati korisnika ${getProfileDisplayName(profile)} iz ustanove ${institutionName}? Uloge u drugim ustanovama ostat će sačuvane.`
+    );
+    if (!confirmed) return;
+
+    setMessage('');
+    const roleIds = profile.role_records.map((record) => record.id).filter(Boolean);
+    const result = roleIds.length
+      ? await supabase.from('user_school_roles').delete().in('id', roleIds)
+      : await supabase
+          .from('user_school_roles')
+          .delete()
+          .eq('user_id', profile.id)
+          .eq('school_id', profile.school_id);
+
+    setMessage(result.error ? result.error.message : 'Korisnik je uklonjen iz ustanove.');
+    if (!result.error) {
+      if (editForm.id === profile.id && editForm.school_id === profile.school_id) {
+        setEditForm({ id: '', school_id: '', name: '', email: '', oib: '', mobile: '' });
+      }
+      roles.reload();
+    }
+  };
+
   return (
     <div className="stack">
+      {editForm.id && (
+        <Panel title="Uredi korisnika">
+          <form className="inline-form" onSubmit={saveEdit}>
+            <input placeholder="Ime i prezime" value={editForm.name} onChange={(event) => setEditForm({ ...editForm, name: event.target.value })} required />
+            <input placeholder="E-mail" value={editForm.email} readOnly title="E-mail računa mijenja se kroz upravljanje prijavom." />
+            <input placeholder="OIB" value={editForm.oib} onChange={(event) => setEditForm({ ...editForm, oib: event.target.value.replace(/\D/g, '').slice(0, 11) })} />
+            <input placeholder="Mobitel" value={editForm.mobile} onChange={(event) => setEditForm({ ...editForm, mobile: event.target.value })} />
+            <button className="primary" type="submit"><CheckCircle2 size={18} /><span>Spremi</span></button>
+            <button className="small-button" type="button" onClick={() => setEditForm({ id: '', school_id: '', name: '', email: '', oib: '', mobile: '' })}>Odustani</button>
+          </form>
+        </Panel>
+      )}
       <Panel
         title={`Nastavnici i stručno osoblje (${staff.length})`}
         action={(
@@ -3201,7 +3285,7 @@ function StaffDirectory({ adminScope = {} }) {
         )}
         <DataState state={roles}>
           <Table
-            columns={['Prezime i ime', 'E-mail', 'OIB', 'Ustanova', 'Uloge', 'Status']}
+            columns={['Prezime i ime', 'E-mail', 'OIB', 'Ustanova', 'Uloge', 'Status', 'Akcije']}
             rows={staff.map((profile) => [
               getProfileDisplayName(profile),
               profile.email ?? '-',
@@ -3213,9 +3297,14 @@ function StaffDirectory({ adminScope = {} }) {
                   .map((role) => <span key={role}>{getStaffRoleLabel(role)}</span>)}
               </div>,
               <span className="status-badge active" key={`${profile.id}-${profile.school_id}-status`}>Aktivan</span>,
+              <div className="row-actions" key={`${profile.id}-${profile.school_id}-actions`}>
+                <button className="small-button" type="button" onClick={() => startEdit(profile)}>Uredi</button>
+                <button className="small-button danger" type="button" onClick={() => deleteFromInstitution(profile)}>Obriši</button>
+              </div>,
             ])}
           />
         </DataState>
+        {message && <p className="notice">{message}</p>}
       </Panel>
     </div>
   );
@@ -3766,6 +3855,158 @@ function Programs({ adminScope = {} }) {
           </div>,
         ])} />
       </DataState>
+      </Panel>
+    </div>
+  );
+}
+
+function Subjects({ adminScope = {} }) {
+  const subjects = useSupabaseQuery(() => {
+    let query = supabase.from('subjects').select('*').order('name');
+    if (adminScope.isScoped) query = query.eq('school_id', adminScope.schoolId);
+    return query;
+  }, [adminScope.schoolId, adminScope.isScoped]);
+  const schools = useSupabaseQuery(() => {
+    let query = supabase.from('schools').select('id,name').order('name');
+    if (adminScope.isScoped) query = query.eq('id', adminScope.schoolId);
+    return query;
+  }, [adminScope.schoolId, adminScope.isScoped]);
+  const [form, setForm] = useState({ school_id: '', name: '', code: '' });
+  const [editForm, setEditForm] = useState({ id: '', school_id: '', name: '', code: '' });
+  const [search, setSearch] = useState('');
+  const [message, setMessage] = useState('');
+
+  const filtered = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase('hr');
+    if (!query) return subjects.data;
+    return subjects.data.filter((subject) => [
+      subject.name,
+      subject.code,
+      schools.data.find((school) => school.id === subject.school_id)?.name,
+    ].filter(Boolean).join(' ').toLocaleLowerCase('hr').includes(query));
+  }, [subjects.data, schools.data, search]);
+
+  const create = async (event) => {
+    event.preventDefault();
+    setMessage('');
+    const schoolId = adminScope.isScoped ? adminScope.schoolId : form.school_id;
+    const { error } = await supabase.from('subjects').insert({
+      id: crypto.randomUUID(),
+      school_id: schoolId,
+      name: form.name.trim(),
+      code: form.code.trim() || null,
+    });
+
+    setMessage(error ? error.message : 'Predmet je dodan.');
+    if (!error) {
+      setForm({ school_id: '', name: '', code: '' });
+      subjects.reload();
+    }
+  };
+
+  const startEdit = (subject) => {
+    setEditForm({
+      id: subject.id,
+      school_id: subject.school_id ?? '',
+      name: subject.name ?? '',
+      code: subject.code ?? '',
+    });
+  };
+
+  const saveEdit = async (event) => {
+    event.preventDefault();
+    setMessage('');
+    const { error } = await supabase
+      .from('subjects')
+      .update({
+        school_id: adminScope.isScoped ? adminScope.schoolId : editForm.school_id,
+        name: editForm.name.trim(),
+        code: editForm.code.trim() || null,
+      })
+      .eq('id', editForm.id);
+
+    setMessage(error ? error.message : 'Predmet je ažuriran.');
+    if (!error) {
+      setEditForm({ id: '', school_id: '', name: '', code: '' });
+      subjects.reload();
+    }
+  };
+
+  const deleteSubject = async (subject) => {
+    const confirmed = window.confirm(
+      `Obrisati predmet ${subject.name}? Ako je predmet povezan s nastavom, ocjenama ili razredima, baza može odbiti brisanje.`
+    );
+    if (!confirmed) return;
+
+    setMessage('');
+    const { error } = await supabase.from('subjects').delete().eq('id', subject.id);
+    setMessage(error ? error.message : 'Predmet je obrisan.');
+    if (!error) subjects.reload();
+  };
+
+  return (
+    <div className="stack">
+      <Panel title="Novi predmet">
+        <form className="inline-form compact" onSubmit={create}>
+          <select
+            value={adminScope.isScoped ? adminScope.schoolId : form.school_id}
+            onChange={(event) => setForm({ ...form, school_id: event.target.value })}
+            required
+            disabled={adminScope.isScoped}
+          >
+            <option value="">Ustanova</option>
+            {schools.data.map((school) => <option key={school.id} value={school.id}>{school.name}</option>)}
+          </select>
+          <input placeholder="Naziv predmeta" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
+          <input placeholder="Šifra predmeta" value={form.code} onChange={(event) => setForm({ ...form, code: event.target.value })} />
+          <button className="primary" type="submit"><UserPlus size={18} /><span>Dodaj</span></button>
+        </form>
+        {message && <p className="notice">{message}</p>}
+      </Panel>
+
+      {editForm.id && (
+        <Panel title="Uredi predmet">
+          <form className="inline-form compact" onSubmit={saveEdit}>
+            <select
+              value={adminScope.isScoped ? adminScope.schoolId : editForm.school_id}
+              onChange={(event) => setEditForm({ ...editForm, school_id: event.target.value })}
+              required
+              disabled={adminScope.isScoped}
+            >
+              <option value="">Ustanova</option>
+              {schools.data.map((school) => <option key={school.id} value={school.id}>{school.name}</option>)}
+            </select>
+            <input placeholder="Naziv predmeta" value={editForm.name} onChange={(event) => setEditForm({ ...editForm, name: event.target.value })} required />
+            <input placeholder="Šifra predmeta" value={editForm.code} onChange={(event) => setEditForm({ ...editForm, code: event.target.value })} />
+            <button className="primary" type="submit"><CheckCircle2 size={18} /><span>Spremi</span></button>
+            <button className="small-button" type="button" onClick={() => setEditForm({ id: '', school_id: '', name: '', code: '' })}>Odustani</button>
+          </form>
+        </Panel>
+      )}
+
+      <Panel
+        title={`Predmeti (${filtered.length})`}
+        action={(
+          <div className="toolbar">
+            <SearchBox value={search} onChange={setSearch} />
+            <ReloadButton onClick={subjects.reload} loading={subjects.loading} />
+          </div>
+        )}
+      >
+        <DataState state={subjects}>
+          <Table
+            columns={['Predmet', 'Šifra', 'Ustanova', 'Akcije']}
+            rows={filtered.map((subject) => [
+              subject.name,
+              subject.code ?? '-',
+              schools.data.find((school) => school.id === subject.school_id)?.name ?? subject.school_id,
+              <div className="row-actions" key={`${subject.id}-actions`}>
+                <button className="small-button" type="button" onClick={() => startEdit(subject)}>Uredi</button>
+                <button className="small-button danger" type="button" onClick={() => deleteSubject(subject)}>Obriši</button>
+              </div>,
+            ])}
+          />
+        </DataState>
       </Panel>
     </div>
   );
