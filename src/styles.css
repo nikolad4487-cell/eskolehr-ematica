@@ -327,6 +327,35 @@ button:disabled {
   min-width: 150px;
 }
 
+.users-toolbar {
+  justify-content: flex-start;
+  padding: 16px 18px;
+  border-bottom: 1px solid #edf0ee;
+}
+
+.users-toolbar .search-box {
+  min-width: min(320px, 100%);
+}
+
+.role-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.role-badges span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 25px;
+  padding: 3px 8px;
+  border: 1px solid #c9dfe1;
+  border-radius: 6px;
+  background: #eef7f6;
+  color: #174f55;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .master-detail {
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(360px, 0.85fr);

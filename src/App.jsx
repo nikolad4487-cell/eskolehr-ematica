@@ -32,6 +32,7 @@ const EMATICA_NAV_ITEMS = [
   { id: 'programs', label: 'Programi', icon: BookOpen },
   { id: 'classes', label: 'Razredi', icon: School },
   { id: 'students', label: 'Učenici', icon: Users },
+  { id: 'users', label: 'Korisnici', icon: UserPlus },
   { id: 'enrollments', label: 'Upisi', icon: UserPlus },
   { id: 'admissions', label: 'e-Upisi', icon: GraduationCap },
   { id: 'student-pins', label: 'Pinovi učenika', icon: KeyRound },
@@ -1049,6 +1050,7 @@ function App() {
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'programs' && <Programs adminScope={adminScope} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'classes' && <Classes adminScope={adminScope} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'students' && <Students scopeProfile={profile} isAdmin={isAdmin} />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'users' && <StaffDirectory adminScope={adminScope} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'enrollments' && <Enrollments />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'admissions' && <AdmissionsModule track={admissionsTrack} profile={profile} session={session} access={access} isStudent={false} isManager />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'student-pins' && <StudentPins />}
@@ -3053,6 +3055,169 @@ function RoleUsersPanel({ title, profiles, schools, onClearAccess }) {
         ])}
       />
     </Panel>
+  );
+}
+
+const STAFF_ROLE_LABELS = {
+  MAIN_ADMIN: 'Glavni administrator',
+  SCHOOL_ADMIN: 'Administrator ustanove',
+  ADMIN: 'Administrator',
+  DIRECTOR: 'Ravnatelj',
+  PRINCIPAL: 'Ravnatelj',
+  TEACHER: 'Nastavnik',
+  HOMEROOM: 'Razrednik',
+  HOMEROOM_TEACHER: 'Razrednik',
+  DEPUTY: 'Zamjenik razrednika',
+  COUNSELOR: 'Stručni suradnik',
+  PEDAGOGUE: 'Pedagog',
+  PEDAGOG: 'Pedagog',
+  PSYCHOLOGIST: 'Psiholog',
+  LIBRARIAN: 'Knjižničar',
+  SECRETARY: 'Tajnik',
+  ACCOUNTANT: 'Računovođa',
+  STAFF: 'Stručno osoblje',
+};
+
+const NON_STAFF_ROLES = new Set(['STUDENT', 'PARENT']);
+
+function normalizeStaffRole(value) {
+  return String(value ?? '').trim().toUpperCase();
+}
+
+function getStaffRoleLabel(value) {
+  const normalized = normalizeStaffRole(value);
+  return STAFF_ROLE_LABELS[normalized] ?? normalized.replaceAll('_', ' ').toLocaleLowerCase('hr');
+}
+
+function StaffDirectory({ adminScope = {} }) {
+  const schools = useSupabaseQuery(() => {
+    let query = supabase.from('schools').select('id,name,education_level').order('name');
+    if (adminScope.isScoped) query = query.eq('id', adminScope.schoolId);
+    return query;
+  }, [adminScope.schoolId, adminScope.isScoped]);
+  const roles = useSupabaseQuery(
+    () => supabase
+      .from('user_school_roles')
+      .select('id,user_id,school_id,role,status,user:user_profiles(*)')
+      .order('school_id'),
+    []
+  );
+  const [schoolId, setSchoolId] = useSessionState(
+    `${SESSION_PREFIX}:users:schoolId`,
+    adminScope.isScoped ? adminScope.schoolId : ''
+  );
+  const [roleFilter, setRoleFilter] = useSessionState(`${SESSION_PREFIX}:users:role`, 'ALL');
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    if (adminScope.isScoped && schoolId !== adminScope.schoolId) {
+      setSchoolId(adminScope.schoolId);
+    }
+  }, [adminScope.isScoped, adminScope.schoolId, schoolId]);
+
+  const staff = useMemo(() => {
+    const merged = new Map();
+
+    roles.data.forEach((row) => {
+      if (row.status && String(row.status).toUpperCase() !== 'ACTIVE') return;
+      if (schoolId && row.school_id !== schoolId) return;
+
+      const role = normalizeStaffRole(row.role);
+      if (!role || NON_STAFF_ROLES.has(role)) return;
+
+      const profile = Array.isArray(row.user) ? row.user[0] : row.user;
+      if (!profile?.id) return;
+
+      const key = `${profile.id}:${row.school_id}`;
+      const current = merged.get(key) ?? {
+        ...profile,
+        school_id: row.school_id,
+        roles: [],
+      };
+      if (!current.roles.includes(role)) current.roles.push(role);
+      merged.set(key, current);
+    });
+
+    const query = search.trim().toLocaleLowerCase('hr');
+    return [...merged.values()]
+      .filter((profile) => roleFilter === 'ALL' || profile.roles.includes(roleFilter))
+      .filter((profile) => {
+        if (!query) return true;
+        return [
+          getProfileDisplayName(profile),
+          profile.email,
+          profile.oib,
+          schools.data.find((school) => school.id === profile.school_id)?.name,
+          ...profile.roles.map(getStaffRoleLabel),
+        ].filter(Boolean).join(' ').toLocaleLowerCase('hr').includes(query);
+      })
+      .sort(compareProfilesByLastName);
+  }, [roles.data, roleFilter, schoolId, schools.data, search]);
+
+  const availableRoles = useMemo(
+    () => [...new Set(roles.data
+      .map((row) => normalizeStaffRole(row.role))
+      .filter((role) => role && !NON_STAFF_ROLES.has(role)))]
+      .sort((a, b) => getStaffRoleLabel(a).localeCompare(getStaffRoleLabel(b), 'hr')),
+    [roles.data]
+  );
+  const exportRows = staff.map((profile) => ({
+    ime_i_prezime: getProfileDisplayName(profile),
+    email: profile.email ?? '',
+    oib: profile.oib ?? '',
+    ustanova: schools.data.find((school) => school.id === profile.school_id)?.name ?? '',
+    uloge: profile.roles.map(getStaffRoleLabel).join(', '),
+    status: 'Aktivan',
+  }));
+
+  return (
+    <div className="stack">
+      <Panel
+        title={`Nastavnici i stručno osoblje (${staff.length})`}
+        action={(
+          <div className="row-actions">
+            <ExportButton rows={exportRows} filename="ematica-korisnici.csv" />
+            <ReloadButton onClick={roles.reload} loading={roles.loading} />
+          </div>
+        )}
+      >
+        <div className="toolbar users-toolbar">
+          <SearchBox value={search} onChange={setSearch} />
+          <select value={schoolId} onChange={(event) => setSchoolId(event.target.value)} disabled={adminScope.isScoped}>
+            <option value="">Sve ustanove</option>
+            {schools.data.map((school) => (
+              <option key={school.id} value={school.id}>{school.name}</option>
+            ))}
+          </select>
+          <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)}>
+            <option value="ALL">Sve uloge</option>
+            {availableRoles.map((role) => (
+              <option key={role} value={role}>{getStaffRoleLabel(role)}</option>
+            ))}
+          </select>
+        </div>
+        {adminScope.isScoped && (
+          <p className="notice">Prikazuju se samo korisnici ustanove {adminScope.schoolName || adminScope.schoolId}.</p>
+        )}
+        <DataState state={roles}>
+          <Table
+            columns={['Prezime i ime', 'E-mail', 'OIB', 'Ustanova', 'Uloge', 'Status']}
+            rows={staff.map((profile) => [
+              getProfileDisplayName(profile),
+              profile.email ?? '-',
+              profile.oib ?? '-',
+              schools.data.find((school) => school.id === profile.school_id)?.name ?? '-',
+              <div className="role-badges" key={`${profile.id}-${profile.school_id}-roles`}>
+                {profile.roles
+                  .sort((a, b) => getStaffRoleLabel(a).localeCompare(getStaffRoleLabel(b), 'hr'))
+                  .map((role) => <span key={role}>{getStaffRoleLabel(role)}</span>)}
+              </div>,
+              <span className="status-badge active" key={`${profile.id}-${profile.school_id}-status`}>Aktivan</span>,
+            ])}
+          />
+        </DataState>
+      </Panel>
+    </div>
   );
 }
 
