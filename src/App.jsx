@@ -1035,7 +1035,7 @@ function App() {
               <h1>{page.label}</h1>
             </div>
             <p>{activeSectionMeta.subtitle}</p>
-            <p className="topbar-meta">{session.user.email}</p>
+            <p className="topbar-meta">{getProfileDisplayName(profile ?? session.user.user_metadata ?? { email: session.user.email })}</p>
           </div>
           <button className="icon-text" type="button" onClick={() => supabase.auth.signOut()} title="Odjava">
             <LogOut size={18} />
@@ -5105,6 +5105,16 @@ function EdnevnikSync() {
   const [pullForm, setPullForm] = useState({ class_id: '' });
   const [pullResults, setPullResults] = useState([]);
   const [message, setMessage] = useState('');
+  const syncStats = useMemo(() => {
+    const rows = sync.data ?? [];
+    return {
+      total: rows.length,
+      synced: rows.filter((row) => row.sync_state === 'SYNCED').length,
+      notLinked: rows.filter((row) => row.sync_state === 'NOT_LINKED').length,
+      failed: rows.filter((row) => row.sync_state === 'FAILED').length,
+      blocked: rows.filter((row) => row.ednevnik_data_entry_blocked).length,
+    };
+  }, [sync.data]);
 
   const link = async (event) => {
     event.preventDefault();
@@ -5143,6 +5153,13 @@ function EdnevnikSync() {
 
   return (
     <div className="stack">
+      <div className="metric-grid">
+        <Metric label="Zapisi za provjeru" value={syncStats.total} />
+        <Metric label="Povezani" value={syncStats.synced} />
+        <Metric label="Nisu povezani" value={syncStats.notLinked} tone="warning" />
+        <Metric label="Greške / blokade" value={syncStats.failed + syncStats.blocked} tone="danger" />
+      </div>
+
       <Panel title="Povuci učenike iz e-Dnevnika u e-Maticu">
         <form className="inline-form compact" onSubmit={pullFromEdnevnik}>
           <select value={pullForm.class_id} onChange={(e) => setPullForm({ ...pullForm, class_id: e.target.value })} required>
@@ -5177,7 +5194,7 @@ function EdnevnikSync() {
             <option value="">e-Dnevnik profil</option>
             {profiles.data.map((profile) => (
               <option key={profile.id} value={profile.id}>
-                {profile.email ?? profile.id}
+                {getProfileDisplayName(profile)}
               </option>
             ))}
           </select>
@@ -6150,9 +6167,10 @@ function csvEscape(value) {
 }
 
 function getProfileDisplayName(profile) {
-  const first = profile.first_name ?? profile.given_name ?? '';
-  const last = profile.last_name ?? profile.family_name ?? '';
-  const full = profile.full_name ?? profile.name ?? [first, last].filter(Boolean).join(' ');
+  const rawName = String(profile.name ?? '').trim();
+  const first = profile.first_name ?? profile.given_name ?? (profile.surname && rawName.includes(' ') ? '' : rawName);
+  const last = profile.last_name ?? profile.family_name ?? profile.surname ?? '';
+  const full = profile.full_name ?? ([first, last].filter(Boolean).join(' ') || rawName);
   if (full) return full;
   const localPart = String(profile.email ?? profile.id ?? '').split('@')[0];
   const parts = localPart.split(/[._\-\s]+/).filter(Boolean);
