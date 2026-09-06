@@ -12,7 +12,6 @@ import {
   EyeOff,
   FileText,
   GraduationCap,
-  KeyRound,
   LayoutDashboard,
   Loader2,
   LogOut,
@@ -36,7 +35,6 @@ const EMATICA_NAV_ITEMS = [
   { id: 'users', label: 'Korisnici', icon: UserPlus },
   { id: 'enrollments', label: 'Upisi', icon: UserPlus },
   { id: 'admissions', label: 'e-Upisi', icon: GraduationCap },
-  { id: 'student-pins', label: 'Pinovi učenika', icon: KeyRound },
   { id: 'transfers', label: 'Premještaji učenika', icon: ArrowRightLeft },
   { id: 'transition', label: 'Prijelaz školske godine', icon: GraduationCap },
   { id: 'sync', label: 'Sinkronizacija e-Dnevnik', icon: Database },
@@ -1055,7 +1053,6 @@ function App() {
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'users' && <StaffDirectory adminScope={adminScope} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'enrollments' && <Enrollments />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'admissions' && <AdmissionsModule track={admissionsTrack} profile={profile} session={session} access={access} isStudent={false} isManager />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'student-pins' && <StudentPins />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'transfers' && <Transfers />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'transition' && <YearTransition />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'sync' && <EdnevnikSync />}
@@ -4626,6 +4623,7 @@ function Enrollments() {
   const [filters, setFilters] = useState({ class_id: '', status: 'ALL' });
   const [statusForm, setStatusForm] = useState({ enrollment_id: '', status: '', reason: '' });
   const [message, setMessage] = useState('');
+  const unassignedStudents = students.data.filter((student) => !student.class_id);
   const filteredEnrollments = enrollments.data.filter((item) => {
     const matchesClass = !filters.class_id || item.class_id === filters.class_id;
     const matchesStatus = filters.status === 'ALL' || item.enrollment_status === filters.status;
@@ -4689,6 +4687,7 @@ function Enrollments() {
     if (!error) {
       enrollments.reload();
       classes.reload();
+      students.reload();
     }
   };
 
@@ -4698,7 +4697,7 @@ function Enrollments() {
         <form className="inline-form compact" onSubmit={enroll}>
           <select value={form.registry_student_id} onChange={(e) => setForm({ ...form, registry_student_id: e.target.value })} required>
             <option value="">Učenik</option>
-            {students.data.map((student) => (
+            {unassignedStudents.map((student) => (
               <option key={student.registry_student_id} value={student.registry_student_id}>
                 {student.full_name} {student.oib ? `(${student.oib})` : ''}
               </option>
@@ -4717,6 +4716,9 @@ function Enrollments() {
             <span>Upiši</span>
           </button>
         </form>
+        {!students.loading && unassignedStudents.length === 0 && (
+          <p className="notice">Svi učenici su već dodijeljeni razredu.</p>
+        )}
         {message && <p className="notice">{message}</p>}
       </Panel>
       <Panel title="Upisi po razredima">
