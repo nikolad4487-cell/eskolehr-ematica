@@ -5104,6 +5104,8 @@ function EdnevnikSync() {
   const [form, setForm] = useState({ registry_student_id: '', ednevnik_student_id: '' });
   const [pullForm, setPullForm] = useState({ class_id: '' });
   const [pullResults, setPullResults] = useState([]);
+  const [syncFilter, setSyncFilter] = useState('ALL');
+  const [syncSearch, setSyncSearch] = useState('');
   const [message, setMessage] = useState('');
   const syncStats = useMemo(() => {
     const rows = sync.data ?? [];
@@ -5115,6 +5117,34 @@ function EdnevnikSync() {
       blocked: rows.filter((row) => row.ednevnik_data_entry_blocked).length,
     };
   }, [sync.data]);
+  const filteredSyncRows = useMemo(() => {
+    const search = syncSearch.trim().toLowerCase();
+    return (sync.data ?? []).filter((row) => {
+      const matchesFilter =
+        syncFilter === 'ALL' ||
+        (syncFilter === 'BLOCKED' ? row.ednevnik_data_entry_blocked : row.sync_state === syncFilter);
+      const searchable = [
+        row.full_name,
+        row.oib,
+        row.email,
+        row.ednevnik_student_id,
+        row.sync_state,
+        row.last_sync_message,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      return matchesFilter && (!search || searchable.includes(search));
+    });
+  }, [sync.data, syncFilter, syncSearch]);
+  const syncFilters = [
+    ['ALL', `Svi (${syncStats.total})`],
+    ['SYNCED', `Povezani (${syncStats.synced})`],
+    ['NOT_LINKED', `Nisu povezani (${syncStats.notLinked})`],
+    ['FAILED', `Greške (${syncStats.failed})`],
+    ['BLOCKED', `Blokirani (${syncStats.blocked})`],
+  ];
 
   const link = async (event) => {
     event.preventDefault();
@@ -5219,7 +5249,29 @@ function EdnevnikSync() {
       </Panel>
       <Panel title="Povlačenje u e-Dnevnik" action={<ReloadButton onClick={sync.reload} loading={sync.loading} />}>
         <DataState state={sync}>
-          <Table columns={['Učenik', 'Status', 'e-Dnevnik ID', 'Sync', 'Blokada unosa', 'Zadnja poruka']} rows={sync.data.map((s) => [s.full_name, <StatusBadge key={`${s.registry_student_id}-status`} value={s.student_status} />, s.ednevnik_student_id ?? '-', s.sync_state, s.ednevnik_data_entry_blocked ? 'Da' : 'Ne', s.last_sync_message ?? '-'])} />
+          <div className="sync-toolbar">
+            <div className="sync-filters" aria-label="Filter statusa sinkronizacije">
+              {syncFilters.map(([value, label]) => (
+                <button
+                  key={value}
+                  className={syncFilter === value ? 'active' : ''}
+                  type="button"
+                  onClick={() => setSyncFilter(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <label className="search-box">
+              <Search size={17} />
+              <input
+                value={syncSearch}
+                onChange={(event) => setSyncSearch(event.target.value)}
+                placeholder="Pretraži učenika, OIB ili e-Dnevnik ID"
+              />
+            </label>
+          </div>
+          <Table columns={['Učenik', 'Status', 'e-Dnevnik ID', 'Sync', 'Blokada unosa', 'Zadnja poruka']} rows={filteredSyncRows.map((s) => [s.full_name, <StatusBadge key={`${s.registry_student_id}-status`} value={s.student_status} />, s.ednevnik_student_id ?? '-', s.sync_state, s.ednevnik_data_entry_blocked ? 'Da' : 'Ne', s.last_sync_message ?? '-'])} />
         </DataState>
       </Panel>
     </div>

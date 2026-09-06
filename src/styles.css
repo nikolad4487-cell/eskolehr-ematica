@@ -754,6 +754,38 @@ select:focus {
   word-break: break-word;
 }
 
+.sync-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid #e5ecef;
+  background: #fbfcfd;
+}
+
+.sync-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sync-filters button {
+  min-height: 34px;
+  border: 1px solid #cad8dd;
+  border-radius: 7px;
+  padding: 7px 10px;
+  background: #ffffff;
+  color: #344c57;
+  font-weight: 700;
+}
+
+.sync-filters button.active {
+  border-color: #23737d;
+  background: #23737d;
+  color: #ffffff;
+}
+
 .status-badge {
   display: inline-flex;
   align-items: center;
