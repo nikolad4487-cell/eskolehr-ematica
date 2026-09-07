@@ -84,6 +84,8 @@ select
   c.section,
   lce.ematica_status as class_enrollment_status,
   coalesce(lce.ednevnik_data_entry_blocked, rs.ednevnik_data_entry_blocked) as data_entry_blocked,
+  coalesce(s.education_level, class_school.education_level) as school_level,
+  p.duration_years as program_duration_years,
   rs.birth_place,
   rs.birth_country,
   rs.foreigner_country,
