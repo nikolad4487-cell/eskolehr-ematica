@@ -73,6 +73,39 @@ const LOCKED_NAV_ITEMS = [
   { id: 'locked', label: 'Pristup', icon: ShieldAlert },
 ];
 
+const EMATICA_NAV_GROUPS = [
+  {
+    id: 'registry',
+    label: 'Matične evidencije',
+    icon: BookOpen,
+    items: ['dashboard', 'schools', 'years', 'programs', 'subjects', 'classes', 'students', 'education-records'],
+  },
+  {
+    id: 'staff',
+    label: 'Djelatnici i prava',
+    icon: UserPlus,
+    items: ['users', 'access'],
+  },
+  {
+    id: 'school-year',
+    label: 'Školska godina',
+    icon: CalendarDays,
+    items: ['enrollments', 'weekly-assignments', 'transport', 'transition'],
+  },
+  {
+    id: 'documents',
+    label: 'Dokumenti',
+    icon: FileText,
+    items: ['documents', 'certificates', 'reports', 'exports'],
+  },
+  {
+    id: 'integrations',
+    label: 'Integracije',
+    icon: Database,
+    items: ['sync', 'admissions', 'transfers'],
+  },
+];
+
 const EMATICA_ADMIN_MODULES = [
   ['schools', 'Škole', 'Ustanove, kontakti i status rada'],
   ['years', 'Školske godine', 'Aktivne godine i arhiva evidencija'],
@@ -925,6 +958,17 @@ function App() {
   const navItems = activeSection === APP_SECTIONS.ematica.id
     ? (canUseEmaticaInApp ? (isAdmin ? adminNavItems : HOMEROOM_NAV_ITEMS) : LOCKED_NAV_ITEMS)
     : (canUseActiveAdmissionsSection ? admissionsNavItems : LOCKED_NAV_ITEMS);
+  const groupedNavigation = activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin
+    ? EMATICA_NAV_GROUPS
+        .map((group) => ({
+          ...group,
+          items: group.items
+            .map((id) => navItems.find((item) => item.id === id))
+            .filter(Boolean),
+        }))
+        .filter((group) => group.items.length > 0)
+    : [];
+  const hasGroupedNavigation = groupedNavigation.length > 0;
 
   useEffect(() => {
     if (!navItems.some((item) => item.id === activePage)) {
@@ -934,6 +978,7 @@ function App() {
 
   const page = navItems.find((item) => item.id === activePage) ?? navItems[0];
   const PageIcon = page.icon;
+  const activeNavGroup = groupedNavigation.find((group) => group.items.some((item) => item.id === activePage)) ?? groupedNavigation[0];
   const activeSectionMeta = APP_SECTIONS[activeSection] ?? APP_SECTIONS.ematica;
   const admissionsTitle = activeSection === APP_SECTIONS.fakulteti.id ? 'Upisi na fakultete' : 'Upisi u srednju';
 
@@ -1005,7 +1050,7 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${hasGroupedNavigation ? 'has-subnav' : ''}`}>
       <aside className="sidebar">
         <div className="brand">
           <School size={26} />
@@ -1015,7 +1060,21 @@ function App() {
           </div>
         </div>
         <nav className="nav-list" aria-label="Glavna navigacija">
-          {navItems.map((item) => {
+          {hasGroupedNavigation ? groupedNavigation.map((group) => {
+            const Icon = group.icon;
+            const active = activeNavGroup?.id === group.id;
+            return (
+              <button
+                key={group.id}
+                className={active ? 'active' : ''}
+                onClick={() => setActivePage(group.items[0].id)}
+                type="button"
+              >
+                <Icon size={18} />
+                <span>{group.label}</span>
+              </button>
+            );
+          }) : navItems.map((item) => {
             const Icon = item.icon;
             return (
               <button
@@ -1031,11 +1090,36 @@ function App() {
           })}
         </nav>
         <div className="sidebar-footer">
-          <div className="sidebar-footer__label">Aktivni modul</div>
-          <strong>{activeSectionMeta.label}</strong>
-          <span>{activeSectionMeta.subtitle}</span>
+          <div className="sidebar-footer__label">{hasGroupedNavigation ? 'Aktivna cjelina' : 'Aktivni modul'}</div>
+          <strong>{hasGroupedNavigation ? activeNavGroup?.label : activeSectionMeta.label}</strong>
+          <span>{hasGroupedNavigation ? activeSectionMeta.label : activeSectionMeta.subtitle}</span>
         </div>
       </aside>
+
+      {hasGroupedNavigation && (
+        <aside className="subnav-sidebar">
+          <div className="subnav-header">
+            <span>Izbornik cjeline</span>
+            <strong>{activeNavGroup?.label}</strong>
+          </div>
+          <nav className="subnav-list" aria-label="Podizbornik e-Matice">
+            {activeNavGroup?.items.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  className={activePage === item.id ? 'active' : ''}
+                  onClick={() => setActivePage(item.id)}
+                  type="button"
+                >
+                  <Icon size={17} />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </aside>
+      )}
 
       <main className="main">
         <header className="topbar">
