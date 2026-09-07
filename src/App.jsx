@@ -3182,12 +3182,12 @@ const EXTENDED_ADMIN_CONFIGS = {
 
 function ExtendedAdminModule({ type }) {
   const config = EXTENDED_ADMIN_CONFIGS[type] ?? EXTENDED_ADMIN_CONFIGS.help;
-  const records = useSupabaseQuery(() => supabase.from(config.view).select('*').order('created_at', { ascending: false }), [config.view]);
-  const schools = useSupabaseQuery(() => supabase.from('schools').select('id,name').order('name'), []);
+  const records = useSupabaseQuery(() => loadDetailedRows(config.view, config.table), [config.view, config.table]);
+  const schools = useSupabaseQuery(() => supabase.from('schools').select('id,name,is_active').eq('is_active', true).order('name'), []);
   const years = useSupabaseQuery(() => supabase.from('school_years').select('id,label,name').order('label'), []);
-  const programs = useSupabaseQuery(() => supabase.from('programs').select('id,name,school_id').order('name'), []);
+  const programs = useSupabaseQuery(() => supabase.from('programs').select('id,name,school_id,is_active').eq('is_active', true).order('name'), []);
   const subjects = useSupabaseQuery(() => supabase.from('subjects').select('id,name,code').order('name'), []);
-  const classes = useSupabaseQuery(() => supabase.from('v_ematica_class_summary').select('class_id,class_name,school_name,school_year_label').order('class_name'), []);
+  const classes = useSupabaseQuery(() => supabase.from('v_ematica_class_summary').select('class_id,class_name,school_id,school_name,school_year_id,school_year_label,is_active').eq('is_active', true).order('class_name'), []);
   const students = useSupabaseQuery(() => supabase.from('v_ematica_students_current').select('registry_student_id,full_name,class_name,school_name').order('full_name'), []);
   const profiles = useSupabaseQuery(() => supabase.from('user_profiles').select('*').order('email'), []);
   const [form, setForm] = useState(() => buildExtendedInitialForm(config));
@@ -3277,11 +3277,11 @@ function ExtendedAdminModule({ type }) {
 function ExportsHub() {
   const students = useSupabaseQuery(() => supabase.from('v_ematica_students_current').select('*').order('full_name'), []);
   const classes = useSupabaseQuery(() => supabase.from('v_ematica_class_summary').select('*').order('class_name'), []);
-  const education = useSupabaseQuery(() => supabase.from('v_student_education_records_detailed').select('*').order('created_at', { ascending: false }), []);
-  const weekly = useSupabaseQuery(() => supabase.from('v_weekly_assignments_detailed').select('*').order('created_at', { ascending: false }), []);
-  const transport = useSupabaseQuery(() => supabase.from('v_student_transport_records_detailed').select('*').order('created_at', { ascending: false }), []);
-  const textbooks = useSupabaseQuery(() => supabase.from('v_textbook_records_detailed').select('*').order('created_at', { ascending: false }), []);
-  const documents = useSupabaseQuery(() => supabase.from('v_school_document_records_detailed').select('*').order('created_at', { ascending: false }), []);
+  const education = useSupabaseQuery(() => loadDetailedRows('v_student_education_records_detailed', 'student_education_records'), []);
+  const weekly = useSupabaseQuery(() => loadDetailedRows('v_weekly_assignments_detailed', 'weekly_assignments'), []);
+  const transport = useSupabaseQuery(() => loadDetailedRows('v_student_transport_records_detailed', 'student_transport_records'), []);
+  const textbooks = useSupabaseQuery(() => loadDetailedRows('v_textbook_records_detailed', 'textbook_records'), []);
+  const documents = useSupabaseQuery(() => loadDetailedRows('v_school_document_records_detailed', 'school_document_records'), []);
   const sync = useSupabaseQuery(() => supabase.from('v_ematica_sync_status').select('*').order('full_name'), []);
   const sources = [
     ['Učenici', students, 'ucenici.csv'],
@@ -3333,9 +3333,21 @@ function buildExtendedInitialForm(config) {
   return Object.fromEntries(config.fields.map((field) => [field.name, field.defaultValue ?? '']));
 }
 
+async function loadDetailedRows(viewName, tableName) {
+  const detailed = await supabase.from(viewName).select('*').order('created_at', { ascending: false });
+  if (!detailed.error || viewName === tableName) return detailed;
+  if (!/schema cache|could not find/i.test(detailed.error.message ?? '')) return detailed;
+  return supabase.from(tableName).select('*').order('created_at', { ascending: false });
+}
+
 function renderExtendedField(field, form, setForm, collections) {
   const value = form[field.name] ?? '';
-  const setValue = (nextValue) => setForm((current) => ({ ...current, [field.name]: nextValue }));
+  const setValue = (nextValue) => setForm((current) => ({
+    ...current,
+    [field.name]: nextValue,
+    ...(field.name === 'school_id' ? { program_id: '', class_id: '' } : {}),
+    ...(field.name === 'school_year_id' ? { class_id: '' } : {}),
+  }));
   const common = {
     key: field.name,
     value,
@@ -3347,7 +3359,7 @@ function renderExtendedField(field, form, setForm, collections) {
     return (
       <select {...common}>
         <option value="">{field.placeholder}</option>
-        {getExtendedFieldOptions(field, collections).map((option) => (
+        {getExtendedFieldOptions(field, collections, form).map((option) => (
           <option key={option.value} value={option.value}>{option.label}</option>
         ))}
       </select>
@@ -3361,14 +3373,27 @@ function renderExtendedField(field, form, setForm, collections) {
   return <input {...common} type={field.type === 'number' ? 'number' : field.type || 'text'} step={field.type === 'number' ? '0.01' : undefined} placeholder={field.placeholder} />;
 }
 
-function getExtendedFieldOptions(field, collections) {
+function getExtendedFieldOptions(field, collections, form = {}) {
   if (field.options) return field.options.map(([value, label]) => ({ value, label }));
   const data = collections[field.source]?.data ?? [];
-  if (field.source === 'schools') return data.map((item) => ({ value: item.id, label: item.name }));
+  const activeSchoolIds = new Set((collections.schools?.data ?? []).map((item) => item.id));
+  if (field.source === 'schools') return data.filter((item) => item.is_active !== false).map((item) => ({ value: item.id, label: item.name }));
   if (field.source === 'years') return data.map((item) => ({ value: item.id, label: item.label ?? item.name }));
-  if (field.source === 'programs') return data.map((item) => ({ value: item.id, label: item.name }));
+  if (field.source === 'programs') {
+    return data
+      .filter((item) => item.is_active !== false)
+      .filter((item) => !form.school_id || item.school_id === form.school_id)
+      .filter((item) => !item.school_id || activeSchoolIds.has(item.school_id))
+      .map((item) => ({ value: item.id, label: item.name }));
+  }
   if (field.source === 'subjects') return data.map((item) => ({ value: item.id, label: item.name }));
-  if (field.source === 'classes') return data.map((item) => ({ value: item.class_id, label: `${item.class_name} - ${item.school_name ?? '-'}` }));
+  if (field.source === 'classes') {
+    return data
+      .filter((item) => item.is_active !== false)
+      .filter((item) => !form.school_id || item.school_id === form.school_id)
+      .filter((item) => !form.school_year_id || item.school_year_id === form.school_year_id)
+      .map((item) => ({ value: item.class_id, label: `${item.class_name} - ${item.school_name ?? '-'}` }));
+  }
   if (field.source === 'students') return data.map((item) => ({ value: item.registry_student_id, label: `${item.full_name} - ${item.class_name ?? 'bez razreda'}` }));
   if (field.source === 'profiles') return data.map((item) => ({ value: item.id, label: getProfileDisplayName(item) }));
   return [];
