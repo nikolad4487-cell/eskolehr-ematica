@@ -1164,20 +1164,20 @@ function App() {
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'classes' && <Classes adminScope={adminScope} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'students' && <Students scopeProfile={profile} isAdmin={isAdmin} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'users' && <StaffDirectory adminScope={adminScope} />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'textbooks' && <DocumentedAdminArea type="textbooks" />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'textbooks' && <ExtendedAdminModule type="textbooks" />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'enrollments' && <Enrollments />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'education-records' && <DocumentedAdminArea type="education-records" />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'education-records' && <ExtendedAdminModule type="education-records" />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'admissions' && <AdmissionsModule track={admissionsTrack} profile={profile} session={session} access={access} isStudent={false} isManager />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'transfers' && <Transfers />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'weekly-assignments' && <DocumentedAdminArea type="weekly-assignments" />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'transport' && <DocumentedAdminArea type="transport" />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'weekly-assignments' && <ExtendedAdminModule type="weekly-assignments" />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'transport' && <ExtendedAdminModule type="transport" />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'transition' && <YearTransition />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'sync' && <EdnevnikSync />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'documents' && <DocumentedAdminArea type="documents" />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'documents' && <ExtendedAdminModule type="documents" />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'certificates' && <YearEndCertificates scopeProfile={profile} isAdmin={isAdmin} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'reports' && <Reports />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'exports' && <DocumentedAdminArea type="exports" />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'help' && <DocumentedAdminArea type="help" />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'exports' && <ExportsHub />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'help' && <ExtendedAdminModule type="help" />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isSuperAdmin && activePage === 'access' && <AccessManagement />}
 
           {activeSection !== APP_SECTIONS.ematica.id && canUseActiveAdmissionsSection && activePage === 'dashboard' && (
@@ -2886,6 +2886,496 @@ function DocumentedAdminArea({ type }) {
       </Panel>
     </div>
   );
+}
+
+const EXTENDED_ADMIN_CONFIGS = {
+  'education-records': {
+    title: 'Obrazovanje učenika',
+    table: 'student_education_records',
+    view: 'v_student_education_records_detailed',
+    filename: 'obrazovanje-ucenika.csv',
+    fields: [
+      { name: 'registry_student_id', type: 'select', source: 'students', placeholder: 'Učenik', required: true },
+      { name: 'school_id', type: 'select', source: 'schools', placeholder: 'Škola' },
+      { name: 'school_year_id', type: 'select', source: 'years', placeholder: 'Školska godina' },
+      { name: 'program_id', type: 'select', source: 'programs', placeholder: 'Program' },
+      { name: 'class_id', type: 'select', source: 'classes', placeholder: 'Razred' },
+      {
+        name: 'record_type',
+        type: 'select',
+        placeholder: 'Vrsta zapisa',
+        required: true,
+        defaultValue: 'PROMJENA_PROGRAMA',
+        options: [
+          ['PROMJENA_PROGRAMA', 'Promjena programa'],
+          ['NASTAVAK_OBRAZOVANJA', 'Nastavak obrazovanja'],
+          ['MATIČNA_EVIDENCIJA', 'Matična evidencija'],
+          ['ZAVRŠETAK', 'Završetak obrazovanja'],
+        ],
+      },
+      { name: 'effective_on', type: 'date', placeholder: 'Datum primjene', defaultValue: todayIso() },
+      { name: 'description', type: 'textarea', placeholder: 'Opis promjene' },
+      {
+        name: 'status',
+        type: 'select',
+        placeholder: 'Status',
+        defaultValue: 'AKTIVNO',
+        options: [['AKTIVNO', 'Aktivno'], ['U_PRIPREMI', 'U pripremi'], ['ARHIVIRANO', 'Arhivirano']],
+      },
+    ],
+    columns: [
+      ['Učenik', (row) => row.full_name],
+      ['Razred', (row) => row.class_name],
+      ['Program', (row) => row.program_name],
+      ['Vrsta', (row) => row.record_type],
+      ['Datum', (row) => formatDate(row.effective_on)],
+      ['Status', (row) => row.status],
+      ['Opis', (row) => row.description],
+    ],
+    exportRow: (row) => ({
+      ucenik: row.full_name,
+      razred: row.class_name,
+      program: row.program_name,
+      vrsta: row.record_type,
+      datum: row.effective_on,
+      status: row.status,
+      opis: row.description,
+    }),
+  },
+  'weekly-assignments': {
+    title: 'Tjedna zaduženja',
+    table: 'weekly_assignments',
+    view: 'v_weekly_assignments_detailed',
+    filename: 'tjedna-zaduzenja.csv',
+    fields: [
+      { name: 'school_id', type: 'select', source: 'schools', placeholder: 'Škola' },
+      { name: 'school_year_id', type: 'select', source: 'years', placeholder: 'Školska godina' },
+      { name: 'staff_profile_id', type: 'select', source: 'profiles', placeholder: 'Djelatnik', required: true },
+      { name: 'subject_id', type: 'select', source: 'subjects', placeholder: 'Predmet' },
+      { name: 'class_id', type: 'select', source: 'classes', placeholder: 'Razred' },
+      {
+        name: 'assignment_type',
+        type: 'select',
+        placeholder: 'Vrsta zaduženja',
+        defaultValue: 'REDOVNA_NASTAVA',
+        options: [
+          ['REDOVNA_NASTAVA', 'Redovna nastava'],
+          ['DOPUNSKA_NASTAVA', 'Dopunska nastava'],
+          ['DODATNA_NASTAVA', 'Dodatna nastava'],
+          ['RAZREDNIŠTVO', 'Razredništvo'],
+          ['OSTALO', 'Ostalo'],
+        ],
+      },
+      { name: 'weekly_hours', type: 'number', placeholder: 'Sati tjedno' },
+      { name: 'annual_hours', type: 'number', placeholder: 'Sati godišnje' },
+      { name: 'starts_on', type: 'date', placeholder: 'Od datuma' },
+      { name: 'ends_on', type: 'date', placeholder: 'Do datuma' },
+      { name: 'note', type: 'textarea', placeholder: 'Napomena' },
+    ],
+    columns: [
+      ['Djelatnik', (row) => row.staff_name || row.staff_email],
+      ['Predmet', (row) => row.subject_name],
+      ['Razred', (row) => row.class_name],
+      ['Vrsta', (row) => row.assignment_type],
+      ['Tjedno', (row) => row.weekly_hours],
+      ['Godišnje', (row) => row.annual_hours],
+      ['Razdoblje', (row) => [formatDate(row.starts_on), formatDate(row.ends_on)].filter((value) => value !== '-').join(' - ') || '-'],
+    ],
+    exportRow: (row) => ({
+      djelatnik: row.staff_name || row.staff_email,
+      predmet: row.subject_name,
+      razred: row.class_name,
+      vrsta: row.assignment_type,
+      tjedno: row.weekly_hours,
+      godisnje: row.annual_hours,
+      od: row.starts_on,
+      do: row.ends_on,
+      napomena: row.note,
+    }),
+  },
+  transport: {
+    title: 'Prijevoz učenika',
+    table: 'student_transport_records',
+    view: 'v_student_transport_records_detailed',
+    filename: 'prijevoz-ucenika.csv',
+    fields: [
+      { name: 'registry_student_id', type: 'select', source: 'students', placeholder: 'Učenik', required: true },
+      { name: 'school_id', type: 'select', source: 'schools', placeholder: 'Škola' },
+      { name: 'school_year_id', type: 'select', source: 'years', placeholder: 'Školska godina' },
+      { name: 'class_id', type: 'select', source: 'classes', placeholder: 'Razred' },
+      { name: 'route_from', type: 'text', placeholder: 'Polazište' },
+      { name: 'route_to', type: 'text', placeholder: 'Odredište' },
+      { name: 'distance_km', type: 'number', placeholder: 'Udaljenost km' },
+      {
+        name: 'transport_type',
+        type: 'select',
+        placeholder: 'Vrsta prijevoza',
+        defaultValue: 'AUTOBUS',
+        options: [['AUTOBUS', 'Autobus'], ['VLAK', 'Vlak'], ['KOMBINIRANO', 'Kombinirano'], ['OSTALO', 'Ostalo']],
+      },
+      { name: 'carrier', type: 'text', placeholder: 'Prijevoznik' },
+      { name: 'price', type: 'number', placeholder: 'Cijena' },
+      {
+        name: 'status',
+        type: 'select',
+        placeholder: 'Status',
+        defaultValue: 'AKTIVNO',
+        options: [['AKTIVNO', 'Aktivno'], ['U_OBRADI', 'U obradi'], ['ARHIVIRANO', 'Arhivirano']],
+      },
+    ],
+    columns: [
+      ['Učenik', (row) => row.full_name],
+      ['Razred', (row) => row.class_name],
+      ['Relacija', (row) => [row.route_from, row.route_to].filter(Boolean).join(' - ')],
+      ['Km', (row) => row.distance_km],
+      ['Vrsta', (row) => row.transport_type],
+      ['Prijevoznik', (row) => row.carrier],
+      ['Status', (row) => row.status],
+    ],
+    exportRow: (row) => ({
+      ucenik: row.full_name,
+      razred: row.class_name,
+      polaziste: row.route_from,
+      odrediste: row.route_to,
+      kilometara: row.distance_km,
+      vrsta: row.transport_type,
+      prijevoznik: row.carrier,
+      cijena: row.price,
+      status: row.status,
+    }),
+  },
+  textbooks: {
+    title: 'Udžbenici',
+    table: 'textbook_records',
+    view: 'v_textbook_records_detailed',
+    filename: 'udzbenici.csv',
+    fields: [
+      { name: 'school_id', type: 'select', source: 'schools', placeholder: 'Škola' },
+      { name: 'school_year_id', type: 'select', source: 'years', placeholder: 'Školska godina' },
+      { name: 'program_id', type: 'select', source: 'programs', placeholder: 'Program' },
+      { name: 'class_id', type: 'select', source: 'classes', placeholder: 'Razred' },
+      { name: 'subject_id', type: 'select', source: 'subjects', placeholder: 'Predmet' },
+      { name: 'title', type: 'text', placeholder: 'Naziv udžbenika', required: true },
+      { name: 'publisher', type: 'text', placeholder: 'Nakladnik' },
+      { name: 'code', type: 'text', placeholder: 'Šifra/kataloški broj' },
+      { name: 'grade_level', type: 'number', placeholder: 'Razred' },
+      {
+        name: 'status',
+        type: 'select',
+        placeholder: 'Status',
+        defaultValue: 'AKTIVNO',
+        options: [['AKTIVNO', 'Aktivno'], ['U_PRIPREMI', 'U pripremi'], ['ARHIVIRANO', 'Arhivirano']],
+      },
+    ],
+    columns: [
+      ['Naziv', (row) => row.title],
+      ['Predmet', (row) => row.subject_name],
+      ['Razred', (row) => row.class_name || row.grade_level],
+      ['Program', (row) => row.program_name],
+      ['Nakladnik', (row) => row.publisher],
+      ['Status', (row) => row.status],
+    ],
+    exportRow: (row) => ({
+      naziv: row.title,
+      predmet: row.subject_name,
+      razred: row.class_name || row.grade_level,
+      program: row.program_name,
+      nakladnik: row.publisher,
+      sifra: row.code,
+      status: row.status,
+    }),
+  },
+  documents: {
+    title: 'Potvrde i isprave',
+    table: 'school_document_records',
+    view: 'v_school_document_records_detailed',
+    filename: 'potvrde-i-isprave.csv',
+    fields: [
+      { name: 'school_id', type: 'select', source: 'schools', placeholder: 'Škola' },
+      { name: 'school_year_id', type: 'select', source: 'years', placeholder: 'Školska godina' },
+      { name: 'registry_student_id', type: 'select', source: 'students', placeholder: 'Učenik' },
+      { name: 'class_id', type: 'select', source: 'classes', placeholder: 'Razred' },
+      {
+        name: 'document_type',
+        type: 'select',
+        placeholder: 'Vrsta dokumenta',
+        defaultValue: 'POTVRDA_O_SKOLOVANJU',
+        options: [
+          ['POTVRDA_O_SKOLOVANJU', 'Potvrda o školovanju'],
+          ['SVJEDODŽBA', 'Svjedodžba'],
+          ['PRIJEPIS_OCJENA', 'Prijepis ocjena'],
+          ['OSTALO', 'Ostalo'],
+        ],
+      },
+      { name: 'document_number', type: 'text', placeholder: 'Urudžbeni / broj dokumenta' },
+      { name: 'issued_on', type: 'date', placeholder: 'Datum izdavanja' },
+      {
+        name: 'status',
+        type: 'select',
+        placeholder: 'Status',
+        defaultValue: 'NACRT',
+        options: [['NACRT', 'Nacrt'], ['IZDANO', 'Izdano'], ['PONIŠTENO', 'Poništeno']],
+      },
+      { name: 'note', type: 'textarea', placeholder: 'Napomena' },
+    ],
+    columns: [
+      ['Dokument', (row) => row.document_type],
+      ['Broj', (row) => row.document_number],
+      ['Učenik', (row) => row.full_name],
+      ['Razred', (row) => row.class_name],
+      ['Datum', (row) => formatDate(row.issued_on)],
+      ['Status', (row) => row.status],
+    ],
+    exportRow: (row) => ({
+      dokument: row.document_type,
+      broj: row.document_number,
+      ucenik: row.full_name,
+      razred: row.class_name,
+      datum: row.issued_on,
+      status: row.status,
+      napomena: row.note,
+    }),
+  },
+  help: {
+    title: 'Pomoć',
+    table: 'help_resources',
+    view: 'help_resources',
+    filename: 'pomoc.csv',
+    fields: [
+      { name: 'title', type: 'text', placeholder: 'Naziv upute', required: true },
+      { name: 'category', type: 'text', placeholder: 'Kategorija', defaultValue: 'Upute' },
+      {
+        name: 'resource_type',
+        type: 'select',
+        placeholder: 'Vrsta',
+        defaultValue: 'PDF',
+        options: [['PDF', 'PDF'], ['VIDEO', 'Video'], ['POVEZNICA', 'Poveznica'], ['NAPOMENA', 'Napomena']],
+      },
+      { name: 'url', type: 'text', placeholder: 'Poveznica' },
+      { name: 'description', type: 'textarea', placeholder: 'Opis' },
+      {
+        name: 'status',
+        type: 'select',
+        placeholder: 'Status',
+        defaultValue: 'AKTIVNO',
+        options: [['AKTIVNO', 'Aktivno'], ['U_PRIPREMI', 'U pripremi'], ['ARHIVIRANO', 'Arhivirano']],
+      },
+    ],
+    columns: [
+      ['Naziv', (row) => row.title],
+      ['Kategorija', (row) => row.category],
+      ['Vrsta', (row) => row.resource_type],
+      ['Poveznica', (row) => row.url ? <a href={row.url} target="_blank" rel="noreferrer">Otvori</a> : '-'],
+      ['Status', (row) => row.status],
+      ['Opis', (row) => row.description],
+    ],
+    exportRow: (row) => ({
+      naziv: row.title,
+      kategorija: row.category,
+      vrsta: row.resource_type,
+      poveznica: row.url,
+      status: row.status,
+      opis: row.description,
+    }),
+  },
+};
+
+function ExtendedAdminModule({ type }) {
+  const config = EXTENDED_ADMIN_CONFIGS[type] ?? EXTENDED_ADMIN_CONFIGS.help;
+  const records = useSupabaseQuery(() => supabase.from(config.view).select('*').order('created_at', { ascending: false }), [config.view]);
+  const schools = useSupabaseQuery(() => supabase.from('schools').select('id,name').order('name'), []);
+  const years = useSupabaseQuery(() => supabase.from('school_years').select('id,label,name').order('label'), []);
+  const programs = useSupabaseQuery(() => supabase.from('programs').select('id,name,school_id').order('name'), []);
+  const subjects = useSupabaseQuery(() => supabase.from('subjects').select('id,name,code').order('name'), []);
+  const classes = useSupabaseQuery(() => supabase.from('v_ematica_class_summary').select('class_id,class_name,school_name,school_year_label').order('class_name'), []);
+  const students = useSupabaseQuery(() => supabase.from('v_ematica_students_current').select('registry_student_id,full_name,class_name,school_name').order('full_name'), []);
+  const profiles = useSupabaseQuery(() => supabase.from('user_profiles').select('*').order('email'), []);
+  const [form, setForm] = useState(() => buildExtendedInitialForm(config));
+  const [query, setQuery] = useState('');
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    setForm(buildExtendedInitialForm(config));
+    setMessage('');
+    setQuery('');
+  }, [type]);
+
+  const collections = { schools, years, programs, subjects, classes, students, profiles };
+  const filtered = useMemo(() => {
+    const value = query.trim().toLowerCase();
+    if (!value) return records.data;
+    return records.data.filter((record) => JSON.stringify(record).toLowerCase().includes(value));
+  }, [records.data, query]);
+  const exportRows = filtered.map(config.exportRow);
+
+  const create = async (event) => {
+    event.preventDefault();
+    setMessage('');
+    const payload = {};
+    config.fields.forEach((field) => {
+      const rawValue = form[field.name];
+      if (field.type === 'number') {
+        payload[field.name] = rawValue === '' || rawValue === null || rawValue === undefined ? null : Number(rawValue);
+      } else {
+        payload[field.name] = String(rawValue ?? '').trim() || null;
+      }
+    });
+
+    const { error } = await supabase.from(config.table).insert(payload);
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    setMessage('Zapis je spremljen.');
+    setForm(buildExtendedInitialForm(config));
+    records.reload();
+  };
+
+  const remove = async (record) => {
+    const confirmed = window.confirm('Obrisati ovaj zapis?');
+    if (!confirmed) return;
+    setMessage('');
+    const { error } = await supabase.from(config.table).delete().eq('id', record.id);
+    setMessage(error ? error.message : 'Zapis je obrisan.');
+    if (!error) records.reload();
+  };
+
+  return (
+    <CrudLayout
+      title={config.title}
+      form={
+        <form className="inline-form compact" onSubmit={create}>
+          {config.fields.map((field) => renderExtendedField(field, form, setForm, collections))}
+          <button className="primary" type="submit"><CheckCircle2 size={18} /><span>Spremi</span></button>
+        </form>
+      }
+      toolbar={
+        <div className="toolbar">
+          <SearchBox value={query} onChange={setQuery} />
+          <ReloadButton onClick={records.reload} loading={records.loading} />
+          <ExportButton rows={exportRows} filename={config.filename} />
+        </div>
+      }
+    >
+      {message && <p className="notice">{message}</p>}
+      <DataState state={records}>
+        <Table
+          columns={[...config.columns.map(([label]) => label), 'Akcije']}
+          rows={filtered.map((record) => [
+            ...config.columns.map(([, value]) => value(record)),
+            <div className="row-actions" key={`${record.id}-actions`}>
+              <button className="small-button danger" type="button" onClick={() => remove(record)}>Obriši</button>
+            </div>,
+          ])}
+        />
+      </DataState>
+    </CrudLayout>
+  );
+}
+
+function ExportsHub() {
+  const students = useSupabaseQuery(() => supabase.from('v_ematica_students_current').select('*').order('full_name'), []);
+  const classes = useSupabaseQuery(() => supabase.from('v_ematica_class_summary').select('*').order('class_name'), []);
+  const education = useSupabaseQuery(() => supabase.from('v_student_education_records_detailed').select('*').order('created_at', { ascending: false }), []);
+  const weekly = useSupabaseQuery(() => supabase.from('v_weekly_assignments_detailed').select('*').order('created_at', { ascending: false }), []);
+  const transport = useSupabaseQuery(() => supabase.from('v_student_transport_records_detailed').select('*').order('created_at', { ascending: false }), []);
+  const textbooks = useSupabaseQuery(() => supabase.from('v_textbook_records_detailed').select('*').order('created_at', { ascending: false }), []);
+  const documents = useSupabaseQuery(() => supabase.from('v_school_document_records_detailed').select('*').order('created_at', { ascending: false }), []);
+  const sync = useSupabaseQuery(() => supabase.from('v_ematica_sync_status').select('*').order('full_name'), []);
+  const sources = [
+    ['Učenici', students, 'ucenici.csv'],
+    ['Razredi', classes, 'razredi.csv'],
+    ['Obrazovanje učenika', education, 'obrazovanje-ucenika.csv'],
+    ['Tjedna zaduženja', weekly, 'tjedna-zaduzenja.csv'],
+    ['Prijevoz učenika', transport, 'prijevoz-ucenika.csv'],
+    ['Udžbenici', textbooks, 'udzbenici.csv'],
+    ['Potvrde i isprave', documents, 'potvrde-i-isprave.csv'],
+    ['Sinkronizacija e-Dnevnik', sync, 'ednevnik-sync.csv'],
+  ];
+  const loading = sources.some(([, state]) => state.loading);
+  const error = sources.find(([, state]) => state.error)?.[1]?.error;
+
+  return (
+    <div className="stack">
+      <SectionHero
+        eyebrow="Eksport/import podataka"
+        title="Izvoz podataka"
+        description="Centralno mjesto za izvoz matičnih evidencija, zaduženja, prijevoza, udžbenika, dokumenata i statusa sinkronizacije."
+        badges={['CSV izvoz', 'Matične evidencije', 'Administracija']}
+      />
+      <div className="metrics-grid">
+        <Metric label="Učenici" value={students.data.length} />
+        <Metric label="Razredi" value={classes.data.length} />
+        <Metric label="Dokumenti" value={documents.data.length} />
+        <Metric label="Sync zapisi" value={sync.data.length} />
+      </div>
+      <Panel title="Dostupni izvozi">
+        {loading && <div className="loading"><Loader2 className="spin" size={18} /> Učitavanje</div>}
+        {error && <div className="error-row"><ShieldAlert size={18} /> {error}</div>}
+        {!loading && !error && (
+          <Table
+            columns={['Skup podataka', 'Zapisa', 'Status', 'Akcije']}
+            rows={sources.map(([label, state, filename]) => [
+              label,
+              state.data.length,
+              state.data.length ? 'Spremno' : 'Nema podataka',
+              <ExportButton key={filename} rows={state.data} filename={filename} label="Izvezi CSV" />,
+            ])}
+          />
+        )}
+      </Panel>
+    </div>
+  );
+}
+
+function buildExtendedInitialForm(config) {
+  return Object.fromEntries(config.fields.map((field) => [field.name, field.defaultValue ?? '']));
+}
+
+function renderExtendedField(field, form, setForm, collections) {
+  const value = form[field.name] ?? '';
+  const setValue = (nextValue) => setForm((current) => ({ ...current, [field.name]: nextValue }));
+  const common = {
+    key: field.name,
+    value,
+    required: Boolean(field.required),
+    onChange: (event) => setValue(event.target.value),
+  };
+
+  if (field.type === 'select') {
+    return (
+      <select {...common}>
+        <option value="">{field.placeholder}</option>
+        {getExtendedFieldOptions(field, collections).map((option) => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
+    );
+  }
+
+  if (field.type === 'textarea') {
+    return <textarea {...common} placeholder={field.placeholder} rows={2} />;
+  }
+
+  return <input {...common} type={field.type === 'number' ? 'number' : field.type || 'text'} step={field.type === 'number' ? '0.01' : undefined} placeholder={field.placeholder} />;
+}
+
+function getExtendedFieldOptions(field, collections) {
+  if (field.options) return field.options.map(([value, label]) => ({ value, label }));
+  const data = collections[field.source]?.data ?? [];
+  if (field.source === 'schools') return data.map((item) => ({ value: item.id, label: item.name }));
+  if (field.source === 'years') return data.map((item) => ({ value: item.id, label: item.label ?? item.name }));
+  if (field.source === 'programs') return data.map((item) => ({ value: item.id, label: item.name }));
+  if (field.source === 'subjects') return data.map((item) => ({ value: item.id, label: item.name }));
+  if (field.source === 'classes') return data.map((item) => ({ value: item.class_id, label: `${item.class_name} - ${item.school_name ?? '-'}` }));
+  if (field.source === 'students') return data.map((item) => ({ value: item.registry_student_id, label: `${item.full_name} - ${item.class_name ?? 'bez razreda'}` }));
+  if (field.source === 'profiles') return data.map((item) => ({ value: item.id, label: getProfileDisplayName(item) }));
+  return [];
+}
+
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function getReportConfig(type, sources) {
