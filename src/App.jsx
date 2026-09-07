@@ -3223,7 +3223,7 @@ function ExtendedAdminModule({ type }) {
 
     const { error } = await supabase.from(config.table).insert(payload);
     if (error) {
-      setMessage(error.message);
+      setMessage(isMissingSchemaError(error) ? getMissingMigrationMessage(config.title) : error.message);
       return;
     }
 
@@ -3336,8 +3336,18 @@ function buildExtendedInitialForm(config) {
 async function loadDetailedRows(viewName, tableName) {
   const detailed = await supabase.from(viewName).select('*').order('created_at', { ascending: false });
   if (!detailed.error || viewName === tableName) return detailed;
-  if (!/schema cache|could not find/i.test(detailed.error.message ?? '')) return detailed;
-  return supabase.from(tableName).select('*').order('created_at', { ascending: false });
+  if (!isMissingSchemaError(detailed.error)) return detailed;
+  const basic = await supabase.from(tableName).select('*').order('created_at', { ascending: false });
+  if (!basic.error || !isMissingSchemaError(basic.error)) return basic;
+  return { data: [], error: null };
+}
+
+function isMissingSchemaError(error) {
+  return /schema cache|could not find the table|could not find/i.test(error?.message ?? '');
+}
+
+function getMissingMigrationMessage(moduleName) {
+  return `${moduleName}: baza još nema nove e-Matica tablice. Primijeni Supabase migracije 034 i 035 pa će unos i tablica raditi.`;
 }
 
 function renderExtendedField(field, form, setForm, collections) {
@@ -3380,11 +3390,16 @@ function getExtendedFieldOptions(field, collections, form = {}) {
   if (field.source === 'schools') return data.filter((item) => item.is_active !== false).map((item) => ({ value: item.id, label: item.name }));
   if (field.source === 'years') return data.map((item) => ({ value: item.id, label: item.label ?? item.name }));
   if (field.source === 'programs') {
-    return data
+    const uniquePrograms = new Map();
+    data
       .filter((item) => item.is_active !== false)
       .filter((item) => !form.school_id || item.school_id === form.school_id)
-      .filter((item) => !item.school_id || activeSchoolIds.has(item.school_id))
-      .map((item) => ({ value: item.id, label: item.name }));
+      .filter((item) => item.school_id && activeSchoolIds.has(item.school_id))
+      .forEach((item) => {
+        const key = `${item.school_id}:${String(item.name ?? '').toLocaleLowerCase('hr')}`;
+        if (!uniquePrograms.has(key)) uniquePrograms.set(key, item);
+      });
+    return [...uniquePrograms.values()].map((item) => ({ value: item.id, label: item.name }));
   }
   if (field.source === 'subjects') return data.map((item) => ({ value: item.id, label: item.name }));
   if (field.source === 'classes') {
