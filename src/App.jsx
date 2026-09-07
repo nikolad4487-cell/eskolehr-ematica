@@ -32,7 +32,8 @@ const EMATICA_NAV_ITEMS = [
   { id: 'subjects', label: 'Predmeti', icon: BookOpen },
   { id: 'classes', label: 'Razredi', icon: School },
   { id: 'students', label: 'Učenici', icon: Users },
-  { id: 'users', label: 'Djelatnici i korisnici', icon: UserPlus },
+  { id: 'users', label: 'Popis djelatnika', icon: UserPlus },
+  { id: 'textbooks', label: 'Udžbenici', icon: BookOpen },
   { id: 'enrollments', label: 'Upisi', icon: UserPlus },
   { id: 'education-records', label: 'Obrazovanje učenika', icon: BookOpen },
   { id: 'admissions', label: 'e-Upisi', icon: GraduationCap },
@@ -45,6 +46,7 @@ const EMATICA_NAV_ITEMS = [
   { id: 'certificates', label: 'Zaključivanje i svjedodžbe', icon: FileText },
   { id: 'reports', label: 'Izvještaji', icon: ClipboardList },
   { id: 'exports', label: 'Izvoz podataka', icon: Download },
+  { id: 'help', label: 'Pomoć', icon: ShieldAlert },
   { id: 'access', label: 'Administratori škola', icon: ShieldAlert },
 ];
 
@@ -75,34 +77,46 @@ const LOCKED_NAV_ITEMS = [
 
 const EMATICA_NAV_GROUPS = [
   {
-    id: 'registry',
-    label: 'Matične evidencije',
-    icon: BookOpen,
-    items: ['dashboard', 'schools', 'years', 'programs', 'subjects', 'classes', 'students', 'education-records'],
+    id: 'institutions',
+    label: 'Ustanove',
+    icon: Building2,
+    items: ['dashboard', 'schools', 'classes', 'years', 'programs', 'subjects'],
   },
   {
     id: 'staff',
-    label: 'Djelatnici i prava',
+    label: 'Djelatnici',
     icon: UserPlus,
-    items: ['users', 'access'],
+    items: ['users', 'weekly-assignments', 'access'],
   },
   {
-    id: 'school-year',
-    label: 'Školska godina',
-    icon: CalendarDays,
-    items: ['enrollments', 'weekly-assignments', 'transport', 'transition'],
+    id: 'students',
+    label: 'Učenici',
+    icon: Users,
+    items: ['students', 'enrollments', 'education-records', 'transport', 'transfers', 'transition'],
   },
   {
-    id: 'documents',
-    label: 'Dokumenti',
+    id: 'textbooks',
+    label: 'Udžbenici',
+    icon: BookOpen,
+    items: ['textbooks'],
+  },
+  {
+    id: 'reports',
+    label: 'Izvješća',
     icon: FileText,
-    items: ['documents', 'certificates', 'reports', 'exports'],
+    items: ['reports', 'documents', 'certificates'],
   },
   {
-    id: 'integrations',
-    label: 'Integracije',
+    id: 'import-export',
+    label: 'Eksport/import podataka',
     icon: Database,
-    items: ['sync', 'admissions', 'transfers'],
+    items: ['exports', 'sync', 'admissions'],
+  },
+  {
+    id: 'help',
+    label: 'Pomoć',
+    icon: ShieldAlert,
+    items: ['help'],
   },
 ];
 
@@ -113,7 +127,8 @@ const EMATICA_ADMIN_MODULES = [
   ['subjects', 'Predmeti', 'Nastavni predmeti i šifre'],
   ['classes', 'Razredi', 'Razredni odjeli, razrednici i programi'],
   ['students', 'Učenici', 'Matični podaci, statusi i kartice učenika'],
-  ['users', 'Djelatnici i korisnici', 'Administratori, razrednici, djelatnici i školske uloge'],
+  ['users', 'Djelatnici', 'Administratori, razrednici, djelatnici i školske uloge'],
+  ['textbooks', 'Udžbenici', 'Evidencija udžbenika i školskih popisa'],
   ['enrollments', 'Upisi', 'Dodjela učenika razredima i statusi upisa'],
   ['education-records', 'Obrazovanje učenika', 'Program, matična ustanova, razdoblja i obrazovni podaci'],
   ['transfers', 'Premještaji', 'Prijelazi učenika između razreda i ustanova'],
@@ -125,6 +140,7 @@ const EMATICA_ADMIN_MODULES = [
   ['certificates', 'Svjedodžbe', 'Zaključivanje i završni dokumenti'],
   ['reports', 'Izvještaji', 'Pregledi za administraciju škole'],
   ['exports', 'Izvoz podataka', 'CSV/XLSX izvozi podataka prikazanih na ekranima'],
+  ['help', 'Pomoć', 'Upute, podrška i opis rada u e-Matici'],
   ['access', 'Administratori škola', 'Dodjela školskih administratora i opseg pristupa'],
 ];
 
@@ -1148,6 +1164,7 @@ function App() {
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'classes' && <Classes adminScope={adminScope} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'students' && <Students scopeProfile={profile} isAdmin={isAdmin} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'users' && <StaffDirectory adminScope={adminScope} />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'textbooks' && <DocumentedAdminArea type="textbooks" />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'enrollments' && <Enrollments />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'education-records' && <DocumentedAdminArea type="education-records" />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'admissions' && <AdmissionsModule track={admissionsTrack} profile={profile} session={session} access={access} isStudent={false} isManager />}
@@ -1160,6 +1177,7 @@ function App() {
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'certificates' && <YearEndCertificates scopeProfile={profile} isAdmin={isAdmin} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'reports' && <Reports />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'exports' && <DocumentedAdminArea type="exports" />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'help' && <DocumentedAdminArea type="help" />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isSuperAdmin && activePage === 'access' && <AccessManagement />}
 
           {activeSection !== APP_SECTIONS.ematica.id && canUseActiveAdmissionsSection && activePage === 'dashboard' && (
@@ -2763,6 +2781,24 @@ const DOCUMENTED_ADMIN_AREAS = {
       ['Status', 'Aktivno, završeno, napomena'],
     ],
   },
+  textbooks: {
+    eyebrow: 'Udžbenici',
+    title: 'Evidencija udžbenika',
+    description: 'Pregled i održavanje udžbenika, popisa i nastavnih materijala vezanih uz programe, razrede i predmete.',
+    badges: ['Popis udžbenika', 'Programi', 'Predmeti'],
+    steps: [
+      ['Odabir ustanove', 'Rad se filtrira prema školi i aktivnoj školskoj godini.'],
+      ['Odabir programa', 'Udžbenici se vežu uz program, razred i predmet.'],
+      ['Uređivanje popisa', 'Dodavanje, promjena i provjera udžbeničkih zapisa.'],
+      ['Izvoz/pregled', 'Pregled popisa za razred, program ili ustanovu.'],
+    ],
+    fields: [
+      ['Udžbenik', 'Naziv, izdavač, šifra, predmet'],
+      ['Program', 'Škola, smjer, razred i školska godina'],
+      ['Status', 'Aktivan, arhiviran, preporučen'],
+      ['Izvoz', 'Popis za razred ili ustanovu'],
+    ],
+  },
   documents: {
     eyebrow: 'Dokumenti',
     title: 'Potvrde i digitalne isprave',
@@ -2797,6 +2833,24 @@ const DOCUMENTED_ADMIN_AREAS = {
       ['Format', 'CSV ili XLSX'],
       ['Opseg', 'Svi zapisi ili samo filtrirani prikaz'],
       ['Vrijeme', 'Datum izvoza i korisnik koji izvozi'],
+    ],
+  },
+  help: {
+    eyebrow: 'Pomoć',
+    title: 'Pomoć i korisničke upute',
+    description: 'Mjesto za upute, videozapise, podršku korisnicima i poveznice na postupke rada u e-Matici.',
+    badges: ['Video upute', 'Dokumentacija', 'Podrška'],
+    steps: [
+      ['Odabir teme', 'Ustanove, djelatnici, učenici, svjedodžbe, izvoz ili početak godine.'],
+      ['Pregled uputa', 'Prikaz kratkih koraka i poveznica na detaljne materijale.'],
+      ['Podrška', 'Kontakt i upute za prijavu problema.'],
+      ['Evidencija', 'Bilježenje često korištenih postupaka za administratore.'],
+    ],
+    fields: [
+      ['Upute', 'PDF dokumenti i videozapisi'],
+      ['Kontakt', 'CARNET/MZOM podrška i lokalni administrator'],
+      ['Tema', 'Kategorija postupka i povezani modul'],
+      ['Status', 'Ažurno, u pripremi, arhivirano'],
     ],
   },
 };
