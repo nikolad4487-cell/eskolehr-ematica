@@ -1,4 +1,4 @@
--- e-Matica phase 36: full student registry card fields.
+-- e-Matica phase 37: automatic student education flags by current class.
 
 alter table public.registry_students
   add column if not exists birth_place text,
@@ -23,6 +23,63 @@ alter table public.registry_students
   add column if not exists finished_school_country text default 'Hrvatska',
   add column if not exists finished_secondary_school_year text,
   add column if not exists photo_url text;
+
+create or replace function public.apply_registry_student_class_flags(p_registry_student_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_class_name text;
+begin
+  if p_registry_student_id is null then
+    return;
+  end if;
+
+  select upper(btrim(c.name))
+  into v_class_name
+  from public.student_class_enrollments sce
+  join public.classes c on c.id = sce.class_id
+  where sce.registry_student_id = p_registry_student_id
+  order by
+    case when coalesce(sce.ematica_status, sce.status::public.enrollment_status, 'ACTIVE'::public.enrollment_status) = 'ACTIVE' then 0 else 1 end,
+    coalesce(sce.school_year, '') desc,
+    sce.created_at desc nulls last
+  limit 1;
+
+  update public.registry_students
+  set adult_education_candidate = coalesce(v_class_name in ('4.A', '4.B'), false),
+      continuing_education = coalesce(v_class_name = '4.I', false),
+      updated_at = now()
+  where id = p_registry_student_id;
+end;
+$$;
+
+create or replace function public.sync_registry_student_class_flags()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform public.apply_registry_student_class_flags(new.registry_student_id);
+  if tg_op = 'UPDATE' and old.registry_student_id is distinct from new.registry_student_id then
+    perform public.apply_registry_student_class_flags(old.registry_student_id);
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_sync_registry_student_class_flags on public.student_class_enrollments;
+create trigger trg_sync_registry_student_class_flags
+after insert or update
+on public.student_class_enrollments
+for each row
+execute function public.sync_registry_student_class_flags();
+
+select public.apply_registry_student_class_flags(id)
+from public.registry_students;
 
 create or replace view public.v_ematica_students_current_extended as
 select

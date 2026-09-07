@@ -3342,6 +3342,12 @@ async function loadDetailedRows(viewName, tableName) {
   return { data: [], error: null };
 }
 
+async function loadStudentsCurrent() {
+  const extended = await supabase.from('v_ematica_students_current_extended').select('*').order('last_name');
+  if (!isMissingSchemaError(extended.error)) return extended;
+  return supabase.from('v_ematica_students_current').select('*').order('last_name');
+}
+
 function isMissingSchemaError(error) {
   return /schema cache|could not find the table|could not find/i.test(error?.message ?? '');
 }
@@ -4996,7 +5002,7 @@ function Students({ scopeProfile = null, isAdmin = true }) {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [syncFilter, setSyncFilter] = useState('ALL');
-  const students = useSupabaseQuery(() => supabase.from('v_ematica_students_current').select('*').order('last_name'), []);
+  const students = useSupabaseQuery(() => loadStudentsCurrent(), []);
   const scopedClasses = useSupabaseQuery(
     async () => {
       if (isAdmin || !scopeProfile?.id) return { data: [], error: null };
@@ -5168,7 +5174,7 @@ function StudentDetailPanel({ student, onMessage, onRefresh }) {
 
     const { error } = await supabase
       .from('registry_students')
-      .update(buildStudentCardPayload(edit))
+      .update(buildStudentCardPayload(edit, student))
       .eq('id', student.registry_student_id);
 
     onMessage(error ? error.message : 'Podaci učenika su spremljeni.');
@@ -5234,6 +5240,8 @@ function StudentDetailPanel({ student, onMessage, onRefresh }) {
     };
     reader.readAsDataURL(file);
   };
+  const educationFlags = getStudentEducationFlagRules(student.class_name);
+  const effectiveEdit = applyStudentEducationFlagRules(edit, student);
 
   return (
     <Panel title="Profil učenika">
@@ -5345,8 +5353,22 @@ function StudentDetailPanel({ student, onMessage, onRefresh }) {
           Nadareni učenik s direktnim upisom na umjetničke akademije
         </label>
         <label className="checkbox-control detail-checkbox">
-          <input type="checkbox" checked={edit.adult_education_candidate} onChange={(e) => setEdit({ ...edit, adult_education_candidate: e.target.checked })} />
-          Kandidat iz sustava obrazovanja odraslih
+          <input
+            type="checkbox"
+            checked={effectiveEdit.adult_education_candidate}
+            disabled={educationFlags.lockAdultEducation}
+            onChange={(e) => setEdit({ ...edit, adult_education_candidate: e.target.checked })}
+          />
+          Obrazovanje odraslih
+        </label>
+        <label className="checkbox-control detail-checkbox">
+          <input
+            type="checkbox"
+            checked={effectiveEdit.continuing_education}
+            disabled={educationFlags.lockContinuingEducation}
+            onChange={(e) => setEdit({ ...edit, continuing_education: e.target.checked })}
+          />
+          Nastavak obrazovanja
         </label>
         <h3>Adresa</h3>
         <label>
@@ -5475,6 +5497,7 @@ function buildStudentCardEdit(student) {
     gender: student?.gender ?? '',
     gifted_direct_art_academy: Boolean(student?.gifted_direct_art_academy),
     adult_education_candidate: Boolean(student?.adult_education_candidate),
+    continuing_education: Boolean(student?.continuing_education),
     email: student?.email ?? '',
     photo_url: student?.photo_url ?? '',
     address_country: student?.address_country ?? student?.country ?? 'Hrvatska',
@@ -5497,8 +5520,9 @@ function buildStudentCardEdit(student) {
   };
 }
 
-function buildStudentCardPayload(edit) {
+function buildStudentCardPayload(edit, student = null) {
   const nullable = (value) => String(value ?? '').trim() || null;
+  const educationEdit = applyStudentEducationFlagRules(edit, student);
   return {
     first_name: edit.first_name.trim(),
     last_name: edit.last_name.trim(),
@@ -5510,7 +5534,8 @@ function buildStudentCardPayload(edit) {
     citizenship: nullable(edit.citizenship),
     gender: nullable(edit.gender),
     gifted_direct_art_academy: Boolean(edit.gifted_direct_art_academy),
-    adult_education_candidate: Boolean(edit.adult_education_candidate),
+    adult_education_candidate: Boolean(educationEdit.adult_education_candidate),
+    continuing_education: Boolean(educationEdit.continuing_education),
     email: nullable(edit.email),
     photo_url: nullable(edit.photo_url),
     address_country: nullable(edit.address_country),
@@ -5530,6 +5555,27 @@ function buildStudentCardPayload(edit) {
     finished_school_name: nullable(edit.finished_school_name),
     finished_school_country: nullable(edit.finished_school_country),
     finished_secondary_school_year: nullable(edit.finished_secondary_school_year),
+  };
+}
+
+function normalizeClassName(className) {
+  return String(className ?? '').trim().toUpperCase();
+}
+
+function getStudentEducationFlagRules(className) {
+  const normalizedClassName = normalizeClassName(className);
+  return {
+    lockAdultEducation: ['4.A', '4.B'].includes(normalizedClassName),
+    lockContinuingEducation: normalizedClassName === '4.I',
+  };
+}
+
+function applyStudentEducationFlagRules(edit, student = null) {
+  const flags = getStudentEducationFlagRules(student?.class_name);
+  return {
+    ...edit,
+    adult_education_candidate: flags.lockAdultEducation ? true : Boolean(edit.adult_education_candidate),
+    continuing_education: flags.lockContinuingEducation ? true : Boolean(edit.continuing_education),
   };
 }
 
