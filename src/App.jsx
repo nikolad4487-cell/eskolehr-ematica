@@ -32,14 +32,19 @@ const EMATICA_NAV_ITEMS = [
   { id: 'subjects', label: 'Predmeti', icon: BookOpen },
   { id: 'classes', label: 'Razredi', icon: School },
   { id: 'students', label: 'Učenici', icon: Users },
-  { id: 'users', label: 'Korisnici', icon: UserPlus },
+  { id: 'users', label: 'Djelatnici i korisnici', icon: UserPlus },
   { id: 'enrollments', label: 'Upisi', icon: UserPlus },
+  { id: 'education-records', label: 'Obrazovanje učenika', icon: BookOpen },
   { id: 'admissions', label: 'e-Upisi', icon: GraduationCap },
   { id: 'transfers', label: 'Premještaji učenika', icon: ArrowRightLeft },
+  { id: 'weekly-assignments', label: 'Tjedna zaduženja', icon: ClipboardList },
+  { id: 'transport', label: 'Prijevoz učenika', icon: ArrowRightLeft },
   { id: 'transition', label: 'Prijelaz školske godine', icon: GraduationCap },
   { id: 'sync', label: 'Sinkronizacija e-Dnevnik', icon: Database },
+  { id: 'documents', label: 'Potvrde i isprave', icon: FileText },
   { id: 'certificates', label: 'Zaključivanje i svjedodžbe', icon: FileText },
   { id: 'reports', label: 'Izvještaji', icon: ClipboardList },
+  { id: 'exports', label: 'Izvoz podataka', icon: Download },
   { id: 'access', label: 'Administratori škola', icon: ShieldAlert },
 ];
 
@@ -66,6 +71,28 @@ const TEACHER_ADMISSIONS_NAV_ITEMS = [
 
 const LOCKED_NAV_ITEMS = [
   { id: 'locked', label: 'Pristup', icon: ShieldAlert },
+];
+
+const EMATICA_ADMIN_MODULES = [
+  ['schools', 'Škole', 'Ustanove, kontakti i status rada'],
+  ['years', 'Školske godine', 'Aktivne godine i arhiva evidencija'],
+  ['programs', 'Programi', 'Smjerovi, trajanje i upisne kvote'],
+  ['subjects', 'Predmeti', 'Nastavni predmeti i šifre'],
+  ['classes', 'Razredi', 'Razredni odjeli, razrednici i programi'],
+  ['students', 'Učenici', 'Matični podaci, statusi i kartice učenika'],
+  ['users', 'Djelatnici i korisnici', 'Administratori, razrednici, djelatnici i školske uloge'],
+  ['enrollments', 'Upisi', 'Dodjela učenika razredima i statusi upisa'],
+  ['education-records', 'Obrazovanje učenika', 'Program, matična ustanova, razdoblja i obrazovni podaci'],
+  ['transfers', 'Premještaji', 'Prijelazi učenika između razreda i ustanova'],
+  ['weekly-assignments', 'Tjedna zaduženja', 'Nastava, ostala zaduženja, praksa i vježbe'],
+  ['transport', 'Prijevoz učenika', 'Evidencija relacija, prijevoznika i prava na prijevoz'],
+  ['transition', 'Prijelaz godine', 'Završetak i prijenos u novu školsku godinu'],
+  ['sync', 'Sinkronizacija', 'Povezivanje podataka iz e-Dnevnika'],
+  ['documents', 'Potvrde i isprave', 'Potvrde o školovanju i digitalno pečatiranje'],
+  ['certificates', 'Svjedodžbe', 'Zaključivanje i završni dokumenti'],
+  ['reports', 'Izvještaji', 'Pregledi za administraciju škole'],
+  ['exports', 'Izvoz podataka', 'CSV/XLSX izvozi podataka prikazanih na ekranima'],
+  ['access', 'Administratori škola', 'Dodjela školskih administratora i opseg pristupa'],
 ];
 
 const APP_SECTIONS = {
@@ -1013,6 +1040,7 @@ function App() {
       <main className="main">
         <header className="topbar">
           <div className="topbar-main">
+            <div className="breadcrumb-line">e-Matica / Administracija</div>
             <div className="section-switcher" aria-label="Moduli sustava">
               {availableSections.map((sectionId) => {
                 const section = APP_SECTIONS[sectionId];
@@ -1033,17 +1061,22 @@ function App() {
               <h1>{page.label}</h1>
             </div>
             <p>{activeSectionMeta.subtitle}</p>
-            <p className="topbar-meta">{getProfileDisplayName(profile ?? session.user.user_metadata ?? { email: session.user.email })}</p>
           </div>
-          <button className="icon-text" type="button" onClick={() => supabase.auth.signOut()} title="Odjava">
-            <LogOut size={18} />
-            <span>Odjava</span>
-          </button>
+          <div className="topbar-actions">
+            <div className="user-chip">
+              <span>Prijavljeni korisnik</span>
+              <strong>{getProfileDisplayName(profile ?? session.user.user_metadata ?? { email: session.user.email })}</strong>
+            </div>
+            <button className="icon-text" type="button" onClick={() => supabase.auth.signOut()} title="Odjava">
+              <LogOut size={18} />
+              <span>Odjava</span>
+            </button>
+          </div>
         </header>
 
         <section className="content">
           {activeSection === APP_SECTIONS.ematica.id && !canUseEmaticaInApp && activePage === 'locked' && <AccessLocked section={activeSection} />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'dashboard' && (isAdmin ? <Dashboard /> : <HomeroomDashboard profile={profile} />)}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'dashboard' && (isAdmin ? <Dashboard onNavigate={setActivePage} isSuperAdmin={isSuperAdmin} /> : <HomeroomDashboard profile={profile} />)}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'schools' && <Schools adminScope={adminScope} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'years' && <SchoolYears adminScope={adminScope} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'programs' && <Programs adminScope={adminScope} />}
@@ -1052,12 +1085,17 @@ function App() {
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'students' && <Students scopeProfile={profile} isAdmin={isAdmin} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'users' && <StaffDirectory adminScope={adminScope} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'enrollments' && <Enrollments />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'education-records' && <DocumentedAdminArea type="education-records" />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'admissions' && <AdmissionsModule track={admissionsTrack} profile={profile} session={session} access={access} isStudent={false} isManager />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'transfers' && <Transfers />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'weekly-assignments' && <DocumentedAdminArea type="weekly-assignments" />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'transport' && <DocumentedAdminArea type="transport" />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'transition' && <YearTransition />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'sync' && <EdnevnikSync />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'documents' && <DocumentedAdminArea type="documents" />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'certificates' && <YearEndCertificates scopeProfile={profile} isAdmin={isAdmin} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'reports' && <Reports />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'exports' && <DocumentedAdminArea type="exports" />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isSuperAdmin && activePage === 'access' && <AccessManagement />}
 
           {activeSection !== APP_SECTIONS.ematica.id && canUseActiveAdmissionsSection && activePage === 'dashboard' && (
@@ -2220,116 +2258,6 @@ function AccessLocked({ section = null }) {
   );
 }
 
-function StudentPins() {
-  const [state, setState] = useState({
-    loading: true,
-    error: '',
-    data: null,
-  });
-
-  const loadPins = async () => {
-    setState((current) => ({ ...current, loading: true, error: '' }));
-    const { data, error } = await supabase.functions.invoke('list-school-admission-pins');
-
-    if (error || data?.error) {
-      setState({
-        loading: false,
-        error: await getEdgeFunctionErrorMessage(data, error, 'PIN-ove nije moguće učitati.'),
-        data: null,
-      });
-      return;
-    }
-
-    setState({ loading: false, error: '', data });
-  };
-
-  useEffect(() => {
-    loadPins();
-  }, []);
-
-  const statusLabel = (value) => ({
-    READY: 'Spreman',
-    NOT_ACTIVATED: 'Čeka prvu prijavu',
-    NO_AUTH_ACCOUNT: 'Nema korisnički račun',
-    NO_PHONE: 'Nema broj mobitela',
-  }[value] ?? value ?? '-');
-
-  const formatDateTime = (value) => {
-    if (!value) return '-';
-    return new Intl.DateTimeFormat('hr-HR', {
-      dateStyle: 'short',
-      timeStyle: 'short',
-    }).format(new Date(value));
-  };
-
-  const students = state.data?.students ?? [];
-  const trackLabel = state.data?.track === 'SECONDARY'
-    ? 'Upis u srednju školu'
-    : state.data?.track === 'HIGHER_EDUCATION'
-      ? 'Upis na fakultet'
-      : 'Nema aktivnog upisnog modula';
-
-  return (
-    <div className="stack">
-      <Panel
-        title="Pinovi učenika"
-        action={<ReloadButton onClick={loadPins} loading={state.loading} />}
-      >
-        <div className="report-summary">
-          <Metric label="Škola" value={state.data?.school?.name ?? '-'} />
-          <Metric label="Školska godina" value={state.data?.school_year?.label ?? '-'} />
-          <Metric label="Upisni sustav" value={trackLabel} />
-          <Metric label="Broj učenika" value={students.length} />
-          <Metric
-            label="Administrativni broj"
-            value={state.data?.administrator_contact?.phone ?? 'Aktivira se automatski pri prvom zahtjevu'}
-          />
-        </div>
-        <p className="notice">
-          Svaki učenik ima jedan trajni četveroznamenkasti PIN. Prikaz je automatski
-          ograničen na vašu školu, aktivnu školsku godinu i učenike koji imaju pravo
-          pristupa odgovarajućem sustavu e-Upisa.
-        </p>
-      </Panel>
-
-      <Panel title="PIN evidencija">
-        <DataState state={state}>
-          <Table
-            columns={[
-              'Učenik',
-              'Razred',
-              'Program',
-              'Korisničko ime',
-              'PIN',
-              'Mobitel',
-              'Dostava',
-              'SMS poslan',
-              'Zadnja potvrda',
-              'Status',
-            ]}
-            rows={students.map((student) => [
-              student.full_name,
-              student.class_name,
-              student.program_name,
-              student.username || '-',
-              student.pin
-                ? <strong className="student-pin" key={`${student.registry_student_id}-pin`}>{student.pin}</strong>
-                : '-',
-              student.phone || '-',
-              student.delivery_method === 'SCHOOL_ADMIN_PHONE'
-                ? 'Administrator škole'
-                : 'Učenikov broj',
-              formatDateTime(student.pin_delivered_at),
-              formatDateTime(student.last_verified_at),
-              statusLabel(student.status),
-            ])}
-          />
-        </DataState>
-      </Panel>
-    </div>
-  );
-}
-
 function YearEndCertificates({ scopeProfile = null, isAdmin = true }) {
   const activeSchoolId = scopeProfile?.active_school_id ?? null;
   const classes = useSupabaseQuery(() => {
@@ -2711,6 +2639,132 @@ function Reports() {
         <DataState state={report.state}>
           <Table columns={report.columns} rows={report.rows} />
         </DataState>
+      </Panel>
+    </div>
+  );
+}
+
+const DOCUMENTED_ADMIN_AREAS = {
+  'education-records': {
+    eyebrow: 'Matična evidencija',
+    title: 'Obrazovanje učenika',
+    description: 'Administracija nastavnog programa, obrazovnih razdoblja, matične ustanove, programa i obrazovnih podataka učenika.',
+    badges: ['Program učenika', 'Matična ustanova', 'Promjene obrazovanja'],
+    steps: [
+      ['Odabir učenika', 'Pretraga po OIB-u, imenu, razredu ili programu.'],
+      ['Program i ustanova', 'Dodavanje ili promjena nastavnog programa i matične ustanove.'],
+      ['Obrazovni podaci', 'Evidencija obrazovanja kroz školsku godinu i prethodne godine.'],
+      ['Kontrola', 'Provjera prije prijelaza godine, svjedodžbi i upisnih procesa.'],
+    ],
+    fields: [
+      ['Učenik', 'OIB, datum rođenja, kontakt, status'],
+      ['Program', 'Nastavni program, godina obrazovanja, matični program'],
+      ['Ustanova', 'Matična ustanova, područna ustanova, umjetnička škola'],
+      ['Razdoblje', 'Školska godina, datum početka, datum promjene'],
+    ],
+  },
+  'weekly-assignments': {
+    eyebrow: 'Zaduženja',
+    title: 'Tjedna zaduženja i praktična nastava',
+    description: 'Evidencija tjednih zaduženja u nastavi, ostalih zaduženja, praktične nastave, vježbi i praktikuma.',
+    badges: ['Tjedna norma', 'Praktična nastava', 'Vježbe'],
+    steps: [
+      ['Nastavna zaduženja', 'Predmeti, razredi, fond sati i razdoblje izvođenja.'],
+      ['Ostala zaduženja', 'Razredništvo, stručni poslovi i ostale obveze.'],
+      ['Praksa i vježbe', 'Programi praktične nastave, vježbe i praktikumi.'],
+      ['Izvoz', 'Pregled i izvoz zaduženja za ustanovu i djelatnika.'],
+    ],
+    fields: [
+      ['Djelatnik', 'Ime, prezime, ustanova, radno mjesto'],
+      ['Predmet/zaduženje', 'Naziv, vrsta, razdoblje, grupa'],
+      ['Fond sati', 'Tjedno, godišnje, ukupno po zaduženju'],
+      ['Program', 'Razred, program, praksa ili praktikum'],
+    ],
+  },
+  transport: {
+    eyebrow: 'Učenici',
+    title: 'Prijevoz učenika',
+    description: 'Evidencija prava na prijevoz, relacija, prijevoznika i podataka potrebnih za izvještavanje.',
+    badges: ['Relacija', 'Prijevoznik', 'Status prava'],
+    steps: [
+      ['Odabir učenika', 'Pretraga učenika i provjera trenutnog razreda.'],
+      ['Relacija', 'Mjesto polaska, odredište, udaljenost i vrsta prijevoza.'],
+      ['Prijevoznik', 'Dodjela prijevoznika i razdoblja korištenja.'],
+      ['Pregled', 'Filtriranje i izvoz evidencije prijevoza.'],
+    ],
+    fields: [
+      ['Učenik', 'Razred, program, školska godina'],
+      ['Relacija', 'Polazište, odredište, kilometraža'],
+      ['Prijevoz', 'Vrsta prijevoza, prijevoznik, cijena'],
+      ['Status', 'Aktivno, završeno, napomena'],
+    ],
+  },
+  documents: {
+    eyebrow: 'Dokumenti',
+    title: 'Potvrde i digitalne isprave',
+    description: 'Ispis potvrda o školovanju, priprema svjedodžbi, statusi isprava i digitalno pečatiranje.',
+    badges: ['Potvrde', 'Svjedodžbe', 'Digitalni pečat'],
+    steps: [
+      ['Odabir učenika/razreda', 'Filtriranje po školskoj godini, ustanovi i razredu.'],
+      ['Priprema dokumenta', 'Generiranje potvrde ili isprave iz matičnih podataka.'],
+      ['Digitalno pečatiranje', 'Pojedinačno ili grupno pečatiranje dokumenata.'],
+      ['Arhiva', 'Pregled statusa, brojeva i izdanih dokumenata.'],
+    ],
+    fields: [
+      ['Dokument', 'Vrsta, broj, status, datum izdavanja'],
+      ['Učenik', 'Identitet, razred, program, školska godina'],
+      ['Potpis/pečat', 'Status pripreme, pečatiranja i izdavanja'],
+      ['Izvoz', 'PDF, CSV i pregled za arhivu'],
+    ],
+  },
+  exports: {
+    eyebrow: 'Izvoz',
+    title: 'Izvoz podataka',
+    description: 'Centralno mjesto za izvoz prikazanih evidencija iz e-Matice u CSV/XLSX formatu.',
+    badges: ['CSV', 'XLSX', 'Filtrirani podaci'],
+    steps: [
+      ['Odabir evidencije', 'Učenici, razredi, upisi, korisnici, svjedodžbe ili sinkronizacija.'],
+      ['Filtriranje', 'Primjena škole, školske godine, razreda i statusa.'],
+      ['Provjera', 'Pregled podataka koji će se izvesti.'],
+      ['Izvoz', 'Preuzimanje datoteke s trenutno prikazanim podacima.'],
+    ],
+    fields: [
+      ['Evidencija', 'Izvor podataka i aktivni filteri'],
+      ['Format', 'CSV ili XLSX'],
+      ['Opseg', 'Svi zapisi ili samo filtrirani prikaz'],
+      ['Vrijeme', 'Datum izvoza i korisnik koji izvozi'],
+    ],
+  },
+};
+
+function DocumentedAdminArea({ type }) {
+  const config = DOCUMENTED_ADMIN_AREAS[type] ?? DOCUMENTED_ADMIN_AREAS.exports;
+
+  return (
+    <div className="stack">
+      <SectionHero
+        eyebrow={config.eyebrow}
+        title={config.title}
+        description={config.description}
+        badges={config.badges}
+      />
+      <div className="split-grid">
+        <WorkflowBoard title="Tijek rada prema e-Matici" steps={config.steps} />
+        <Panel title="Podaci koje modul vodi">
+          <Table columns={['Skupina podataka', 'Sadržaj']} rows={config.fields} />
+        </Panel>
+      </div>
+      <Panel title="Status implementacije">
+        <div className="implementation-note">
+          <CheckCircle2 size={22} />
+          <div>
+            <strong>Modul je dodan u administraciju.</strong>
+            <span>
+              Ekran je složen prema službenim uputama i spreman je za idući korak:
+              povezivanje s konkretnim tablicama i akcijama gdje podaci još nisu u bazi.
+            </span>
+          </div>
+        </div>
       </Panel>
     </div>
   );
@@ -3335,7 +3389,7 @@ function StaffDirectory({ adminScope = {} }) {
   );
 }
 
-function Dashboard() {
+function Dashboard({ onNavigate, isSuperAdmin = false }) {
   const stats = useSupabaseQuery(() => supabase.from('v_ematica_dashboard_stats').select('*').single(), []);
   const sync = useSupabaseQuery(
     () => supabase.from('v_ematica_sync_status').select('*').order('last_sync_at', { ascending: false }).limit(8),
@@ -3356,8 +3410,8 @@ function Dashboard() {
       <SectionHero
         eyebrow="e-Matica"
         title="Administrativno središte sustava"
-        description="Ovdje vodimo škole, školske godine, razrede, programe, učenike, prijelaze, dokumente i pripremu podataka za upisne procese."
-        badges={["Matične evidencije", "Prijelazi i premještaji", "Završni dokumenti"]}
+        description="Jedno mjesto za administraciju ustanova, školskih godina, programa, razreda, učenika, korisnika, upisa, premještaja, sinkronizacije i završnih dokumenata."
+        badges={["Korisnici", "Razredi", "Učenici", "Školske godine", "Dokumenti"]}
       />
       <div className="metric-grid">
         <Metric label="Aktivni učenici" value={data.active_students_count} />
@@ -3365,6 +3419,7 @@ function Dashboard() {
         <Metric label="Završili" value={data.graduated_students_count} />
         <Metric label="Nisu povezani" value={data.not_linked_to_ednevnik_count} tone="danger" />
       </div>
+      <AdminModuleGrid onNavigate={onNavigate} isSuperAdmin={isSuperAdmin} />
       <div className="split-grid">
         <Panel title="Temeljni tok rada">
           <Table
@@ -3475,6 +3530,28 @@ function HomeroomDashboard({ profile }) {
         </DataState>
       </Panel>
     </div>
+  );
+}
+
+function AdminModuleGrid({ onNavigate, isSuperAdmin = false }) {
+  const modules = EMATICA_ADMIN_MODULES.filter(([id]) => isSuperAdmin || id !== 'access');
+
+  return (
+    <section className="module-grid" aria-label="Administracijski moduli">
+      {modules.map(([id, title, description]) => {
+        const navItem = EMATICA_NAV_ITEMS.find((item) => item.id === id);
+        const Icon = navItem?.icon ?? LayoutDashboard;
+        return (
+          <button key={id} className="module-card" type="button" onClick={() => onNavigate?.(id)}>
+            <span className="module-card__icon"><Icon size={20} /></span>
+            <span className="module-card__body">
+              <strong>{title}</strong>
+              <span>{description}</span>
+            </span>
+          </button>
+        );
+      })}
+    </section>
   );
 }
 
