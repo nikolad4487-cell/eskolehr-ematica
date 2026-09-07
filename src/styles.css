@@ -55,7 +55,7 @@ button:disabled {
 }
 
 .app-shell.has-subnav {
-  grid-template-columns: 246px 250px minmax(0, 1fr);
+  grid-template-columns: 250px minmax(0, 1fr);
 }
 
 .sidebar {
@@ -69,69 +69,6 @@ button:disabled {
   flex-direction: column;
   gap: 18px;
   box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.08);
-}
-
-.subnav-sidebar {
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 20px 14px;
-  border-right: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.86);
-  box-shadow: 12px 0 28px rgba(26, 46, 56, 0.04);
-  backdrop-filter: blur(10px);
-}
-
-.subnav-header {
-  display: grid;
-  gap: 5px;
-  min-height: 80px;
-  padding: 12px 10px 16px;
-  border-bottom: 1px solid var(--line);
-}
-
-.subnav-header span {
-  color: #758690;
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.subnav-header strong {
-  color: var(--ink);
-  font-size: 18px;
-  line-height: 1.15;
-}
-
-.subnav-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.subnav-list button {
-  display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
-  min-height: 42px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  padding: 10px 11px;
-  background: transparent;
-  color: #40525c;
-  text-align: left;
-  font-weight: 700;
-}
-
-.subnav-list button:hover,
-.subnav-list button.active {
-  border-color: #c4d6df;
-  background: #eef7fa;
-  color: var(--brand-dark);
 }
 
 .brand {
@@ -185,6 +122,59 @@ button:disabled {
   background: #ffffff;
   color: var(--brand-dark);
   box-shadow: 0 10px 22px rgba(4, 16, 24, 0.2);
+}
+
+.has-subnav .sidebar {
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
+  border-right: 1px solid var(--line);
+  box-shadow: 10px 0 26px rgba(23, 40, 48, 0.05);
+  backdrop-filter: blur(10px);
+}
+
+.has-subnav .brand {
+  border-bottom-color: var(--line);
+}
+
+.has-subnav .brand strong {
+  color: var(--brand-dark);
+}
+
+.has-subnav .brand span {
+  color: var(--muted);
+}
+
+.has-subnav .nav-list {
+  gap: 5px;
+}
+
+.has-subnav .nav-list button {
+  border: 1px solid transparent;
+  color: #40525c;
+  background: transparent;
+  box-shadow: none;
+}
+
+.has-subnav .nav-list button:hover,
+.has-subnav .nav-list button.active {
+  border-color: #c4d6df;
+  background: #e9f4f8;
+  color: var(--brand-dark);
+  box-shadow: none;
+}
+
+.has-subnav .sidebar-footer {
+  border-color: var(--line);
+  background: #f6fafb;
+}
+
+.has-subnav .sidebar-footer__label,
+.has-subnav .sidebar-footer span {
+  color: var(--muted);
+}
+
+.has-subnav .sidebar-footer strong {
+  color: var(--ink);
 }
 
 .sidebar-footer {
@@ -271,6 +261,42 @@ button:disabled {
 .section-switcher button:hover {
   background: var(--brand-dark);
   border-color: var(--brand-dark);
+  color: #ffffff;
+}
+
+.main-tabs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0;
+  border: 1px solid #aebfca;
+  border-radius: 8px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #e3edf3 0%, #cddbe5 100%);
+  width: fit-content;
+}
+
+.main-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  border: 0;
+  border-right: 1px solid #aebfca;
+  padding: 0 14px;
+  background: transparent;
+  color: #264655;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.main-tabs button:last-child {
+  border-right: 0;
+}
+
+.main-tabs button:hover,
+.main-tabs button.active {
+  background: linear-gradient(180deg, #2f7796 0%, #145878 100%);
   color: #ffffff;
 }
 
@@ -1403,8 +1429,7 @@ select:focus {
     grid-template-columns: 1fr;
   }
 
-  .sidebar,
-  .subnav-sidebar {
+  .sidebar {
     position: sticky;
     top: 0;
     height: auto;
@@ -1412,24 +1437,16 @@ select:focus {
     padding: 12px;
   }
 
-  .subnav-sidebar {
-    top: auto;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
-  }
-
   .brand {
     padding-bottom: 10px;
   }
 
-  .nav-list,
-  .subnav-list {
+  .nav-list {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .nav-list button,
-  .subnav-list button {
+  .nav-list button {
     grid-template-columns: 20px 1fr;
     min-width: 0;
   }
@@ -1496,12 +1513,8 @@ select:focus {
     grid-template-columns: 1fr 1fr;
   }
 
-  .subnav-list {
-    grid-template-columns: 1fr;
-  }
-
   .metric-grid,
-    .report-summary,
+  .report-summary,
   .module-grid,
   .workflow-board,
   .student-summary,

@@ -1060,21 +1060,7 @@ function App() {
           </div>
         </div>
         <nav className="nav-list" aria-label="Glavna navigacija">
-          {hasGroupedNavigation ? groupedNavigation.map((group) => {
-            const Icon = group.icon;
-            const active = activeNavGroup?.id === group.id;
-            return (
-              <button
-                key={group.id}
-                className={active ? 'active' : ''}
-                onClick={() => setActivePage(group.items[0].id)}
-                type="button"
-              >
-                <Icon size={18} />
-                <span>{group.label}</span>
-              </button>
-            );
-          }) : navItems.map((item) => {
+          {(hasGroupedNavigation ? activeNavGroup?.items ?? [] : navItems).map((item) => {
             const Icon = item.icon;
             return (
               <button
@@ -1090,36 +1076,11 @@ function App() {
           })}
         </nav>
         <div className="sidebar-footer">
-          <div className="sidebar-footer__label">{hasGroupedNavigation ? 'Aktivna cjelina' : 'Aktivni modul'}</div>
+          <div className="sidebar-footer__label">{hasGroupedNavigation ? 'Podizbornik' : 'Aktivni modul'}</div>
           <strong>{hasGroupedNavigation ? activeNavGroup?.label : activeSectionMeta.label}</strong>
           <span>{hasGroupedNavigation ? activeSectionMeta.label : activeSectionMeta.subtitle}</span>
         </div>
       </aside>
-
-      {hasGroupedNavigation && (
-        <aside className="subnav-sidebar">
-          <div className="subnav-header">
-            <span>Izbornik cjeline</span>
-            <strong>{activeNavGroup?.label}</strong>
-          </div>
-          <nav className="subnav-list" aria-label="Podizbornik e-Matice">
-            {activeNavGroup?.items.map((item) => {
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.id}
-                  className={activePage === item.id ? 'active' : ''}
-                  onClick={() => setActivePage(item.id)}
-                  type="button"
-                >
-                  <Icon size={17} />
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-        </aside>
-      )}
 
       <main className="main">
         <header className="topbar">
@@ -1140,6 +1101,25 @@ function App() {
                 );
               })}
             </div>
+            {hasGroupedNavigation && (
+              <nav className="main-tabs" aria-label="Glavne kartice e-Matice">
+                {groupedNavigation.map((group) => {
+                  const Icon = group.icon;
+                  const active = activeNavGroup?.id === group.id;
+                  return (
+                    <button
+                      key={group.id}
+                      className={active ? 'active' : ''}
+                      type="button"
+                      onClick={() => setActivePage(group.items[0].id)}
+                    >
+                      <Icon size={17} />
+                      <span>{group.label}</span>
+                    </button>
+                  );
+                })}
+              </nav>
+            )}
             <div className="page-title">
               <PageIcon size={24} />
               <h1>{page.label}</h1>
