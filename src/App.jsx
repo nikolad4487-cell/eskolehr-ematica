@@ -5143,24 +5143,12 @@ function Students({ scopeProfile = null, isAdmin = true }) {
 
 function StudentDetailPanel({ student, onMessage, onRefresh }) {
   const classes = useSupabaseQuery(() => supabase.from('v_ematica_class_summary').select('*').order('class_name'), []);
-  const [edit, setEdit] = useState({
-    first_name: '',
-    last_name: '',
-    oib: '',
-    email: '',
-    phone: '',
-  });
+  const [edit, setEdit] = useState(() => buildStudentCardEdit(null));
   const [action, setAction] = useState({ status: '', class_id: '', reason: '' });
 
   useEffect(() => {
     if (!student) return;
-    setEdit({
-      first_name: student.first_name ?? '',
-      last_name: student.last_name ?? '',
-      oib: student.oib ?? '',
-      email: student.email ?? '',
-      phone: student.phone ?? '',
-    });
+    setEdit(buildStudentCardEdit(student));
   }, [student?.registry_student_id]);
 
   if (!student) {
@@ -5180,13 +5168,7 @@ function StudentDetailPanel({ student, onMessage, onRefresh }) {
 
     const { error } = await supabase
       .from('registry_students')
-      .update({
-        first_name: edit.first_name.trim(),
-        last_name: edit.last_name.trim(),
-        oib: edit.oib.trim() || null,
-        email: edit.email.trim() || null,
-        phone: edit.phone.trim() || null,
-      })
+      .update(buildStudentCardPayload(edit))
       .eq('id', student.registry_student_id);
 
     onMessage(error ? error.message : 'Podaci učenika su spremljeni.');
@@ -5243,10 +5225,24 @@ function StudentDetailPanel({ student, onMessage, onRefresh }) {
     if (!error) onRefresh();
   };
 
+  const selectPhoto = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setEdit((current) => ({ ...current, photo_url: String(reader.result ?? '') }));
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <Panel title="Profil učenika">
       <div className="detail-hero">
-        <div className="avatar">{getInitials(student.full_name)}</div>
+        {student.photo_url ? (
+          <img className="avatar photo" src={student.photo_url} alt={student.full_name} />
+        ) : (
+          <div className="avatar">{getInitials(student.full_name)}</div>
+        )}
         <div>
           <h3>{student.full_name}</h3>
           <div className="detail-badges">
@@ -5275,9 +5271,18 @@ function StudentDetailPanel({ student, onMessage, onRefresh }) {
           <span>Školska godina</span>
           <strong>{student.school_year_label ?? '-'}</strong>
         </div>
+        <div>
+          <span>Datum i mjesto rođenja</span>
+          <strong>{[formatDate(student.date_of_birth), student.birth_place].filter((value) => value && value !== '-').join(', ') || '-'}</strong>
+        </div>
+        <div>
+          <span>Državljanstvo</span>
+          <strong>{student.citizenship ?? '-'}</strong>
+        </div>
       </div>
 
       <form className="detail-form" onSubmit={save}>
+        <h3>Osobni podaci</h3>
         <label>
           Ime
           <input value={edit.first_name} onChange={(e) => setEdit({ ...edit, first_name: e.target.value })} required />
@@ -5291,12 +5296,129 @@ function StudentDetailPanel({ student, onMessage, onRefresh }) {
           <input value={edit.oib} onChange={(e) => setEdit({ ...edit, oib: e.target.value })} />
         </label>
         <label>
+          Datum rođenja
+          <input type="date" value={edit.date_of_birth} onChange={(e) => setEdit({ ...edit, date_of_birth: e.target.value })} />
+        </label>
+        <label>
+          Mjesto rođenja
+          <input value={edit.birth_place} onChange={(e) => setEdit({ ...edit, birth_place: e.target.value })} />
+        </label>
+        <label>
+          Država rođenja
+          <input value={edit.birth_country} onChange={(e) => setEdit({ ...edit, birth_country: e.target.value })} />
+        </label>
+        <label>
+          Stranac/država
+          <input value={edit.foreigner_country} onChange={(e) => setEdit({ ...edit, foreigner_country: e.target.value })} />
+        </label>
+        <label>
+          Državljanstvo
+          <input value={edit.citizenship} onChange={(e) => setEdit({ ...edit, citizenship: e.target.value })} />
+        </label>
+        <label>
+          Spol
+          <select value={edit.gender} onChange={(e) => setEdit({ ...edit, gender: e.target.value })}>
+            <option value="">Nije upisano</option>
+            <option value="M">M</option>
+            <option value="Ž">Ž</option>
+          </select>
+        </label>
+        <label>
           E-mail
           <input value={edit.email} onChange={(e) => setEdit({ ...edit, email: e.target.value })} />
         </label>
         <label>
-          Telefon
+          URL fotografije
+          <input value={edit.photo_url} onChange={(e) => setEdit({ ...edit, photo_url: e.target.value })} />
+        </label>
+        <label>
+          Odaberi fotografiju
+          <input type="file" accept="image/*" onChange={selectPhoto} />
+        </label>
+        {edit.photo_url && (
+          <button className="small-button" type="button" onClick={() => setEdit({ ...edit, photo_url: '' })}>
+            Ukloni fotografiju
+          </button>
+        )}
+        <label className="checkbox-control detail-checkbox">
+          <input type="checkbox" checked={edit.gifted_direct_art_academy} onChange={(e) => setEdit({ ...edit, gifted_direct_art_academy: e.target.checked })} />
+          Nadareni učenik s direktnim upisom na umjetničke akademije
+        </label>
+        <label className="checkbox-control detail-checkbox">
+          <input type="checkbox" checked={edit.adult_education_candidate} onChange={(e) => setEdit({ ...edit, adult_education_candidate: e.target.checked })} />
+          Kandidat iz sustava obrazovanja odraslih
+        </label>
+        <h3>Adresa</h3>
+        <label>
+          Država
+          <input value={edit.address_country} onChange={(e) => setEdit({ ...edit, address_country: e.target.value })} />
+        </label>
+        <label>
+          Mjesto
+          <input value={edit.city} onChange={(e) => setEdit({ ...edit, city: e.target.value })} />
+        </label>
+        <label>
+          Poštanski broj
+          <input value={edit.postal_code} onChange={(e) => setEdit({ ...edit, postal_code: e.target.value })} />
+        </label>
+        <label>
+          Ulica i broj
+          <input value={edit.address} onChange={(e) => setEdit({ ...edit, address: e.target.value })} />
+        </label>
+        <h3>Roditelji</h3>
+        <label>
+          Ime majke
+          <input value={edit.mother_first_name} onChange={(e) => setEdit({ ...edit, mother_first_name: e.target.value })} />
+        </label>
+        <label>
+          Ime majke u genitivu
+          <input value={edit.mother_first_name_genitive} onChange={(e) => setEdit({ ...edit, mother_first_name_genitive: e.target.value })} />
+        </label>
+        <label>
+          Prezime majke
+          <input value={edit.mother_last_name} onChange={(e) => setEdit({ ...edit, mother_last_name: e.target.value })} />
+        </label>
+        <label>
+          Ime oca
+          <input value={edit.father_first_name} onChange={(e) => setEdit({ ...edit, father_first_name: e.target.value })} />
+        </label>
+        <label>
+          Ime oca u genitivu
+          <input value={edit.father_first_name_genitive} onChange={(e) => setEdit({ ...edit, father_first_name_genitive: e.target.value })} />
+        </label>
+        <label>
+          Prezime oca
+          <input value={edit.father_last_name} onChange={(e) => setEdit({ ...edit, father_last_name: e.target.value })} />
+        </label>
+        <h3>Mobitel</h3>
+        <label>
+          Pozivni broj države
+          <input value={edit.phone_country_code} onChange={(e) => setEdit({ ...edit, phone_country_code: e.target.value })} />
+        </label>
+        <label>
+          Mreža
+          <input value={edit.phone_network} onChange={(e) => setEdit({ ...edit, phone_network: e.target.value })} />
+        </label>
+        <label>
+          Broj
           <input value={edit.phone} onChange={(e) => setEdit({ ...edit, phone: e.target.value })} />
+        </label>
+        <label>
+          Broj bez pozivnog
+          <input value={edit.phone_number} onChange={(e) => setEdit({ ...edit, phone_number: e.target.value })} />
+        </label>
+        <h3>Prethodno obrazovanje</h3>
+        <label>
+          Škola
+          <input value={edit.finished_school_name} onChange={(e) => setEdit({ ...edit, finished_school_name: e.target.value })} />
+        </label>
+        <label>
+          Država škole
+          <input value={edit.finished_school_country} onChange={(e) => setEdit({ ...edit, finished_school_country: e.target.value })} />
+        </label>
+        <label>
+          Školska godina u kojoj je završena srednja škola
+          <input value={edit.finished_secondary_school_year} onChange={(e) => setEdit({ ...edit, finished_secondary_school_year: e.target.value })} />
         </label>
         <button className="primary" type="submit">
           <CheckCircle2 size={18} />
@@ -5338,6 +5460,77 @@ function StudentDetailPanel({ student, onMessage, onRefresh }) {
       </div>
     </Panel>
   );
+}
+
+function buildStudentCardEdit(student) {
+  return {
+    first_name: student?.first_name ?? '',
+    last_name: student?.last_name ?? '',
+    oib: student?.oib ?? '',
+    date_of_birth: student?.date_of_birth ?? '',
+    birth_place: student?.birth_place ?? '',
+    birth_country: student?.birth_country ?? 'Hrvatska',
+    foreigner_country: student?.foreigner_country ?? '',
+    citizenship: student?.citizenship ?? 'hrvatsko',
+    gender: student?.gender ?? '',
+    gifted_direct_art_academy: Boolean(student?.gifted_direct_art_academy),
+    adult_education_candidate: Boolean(student?.adult_education_candidate),
+    email: student?.email ?? '',
+    photo_url: student?.photo_url ?? '',
+    address_country: student?.address_country ?? student?.country ?? 'Hrvatska',
+    city: student?.city ?? '',
+    postal_code: student?.postal_code ?? '',
+    address: student?.address ?? '',
+    mother_first_name: student?.mother_first_name ?? '',
+    mother_first_name_genitive: student?.mother_first_name_genitive ?? '',
+    mother_last_name: student?.mother_last_name ?? '',
+    father_first_name: student?.father_first_name ?? '',
+    father_first_name_genitive: student?.father_first_name_genitive ?? '',
+    father_last_name: student?.father_last_name ?? '',
+    phone_country_code: student?.phone_country_code ?? '',
+    phone_network: student?.phone_network ?? '',
+    phone: student?.phone ?? '',
+    phone_number: student?.phone_number ?? '',
+    finished_school_name: student?.finished_school_name ?? '',
+    finished_school_country: student?.finished_school_country ?? 'Hrvatska',
+    finished_secondary_school_year: student?.finished_secondary_school_year ?? '',
+  };
+}
+
+function buildStudentCardPayload(edit) {
+  const nullable = (value) => String(value ?? '').trim() || null;
+  return {
+    first_name: edit.first_name.trim(),
+    last_name: edit.last_name.trim(),
+    oib: nullable(edit.oib),
+    date_of_birth: nullable(edit.date_of_birth),
+    birth_place: nullable(edit.birth_place),
+    birth_country: nullable(edit.birth_country),
+    foreigner_country: nullable(edit.foreigner_country),
+    citizenship: nullable(edit.citizenship),
+    gender: nullable(edit.gender),
+    gifted_direct_art_academy: Boolean(edit.gifted_direct_art_academy),
+    adult_education_candidate: Boolean(edit.adult_education_candidate),
+    email: nullable(edit.email),
+    photo_url: nullable(edit.photo_url),
+    address_country: nullable(edit.address_country),
+    city: nullable(edit.city),
+    postal_code: nullable(edit.postal_code),
+    address: nullable(edit.address),
+    mother_first_name: nullable(edit.mother_first_name),
+    mother_first_name_genitive: nullable(edit.mother_first_name_genitive),
+    mother_last_name: nullable(edit.mother_last_name),
+    father_first_name: nullable(edit.father_first_name),
+    father_first_name_genitive: nullable(edit.father_first_name_genitive),
+    father_last_name: nullable(edit.father_last_name),
+    phone_country_code: nullable(edit.phone_country_code),
+    phone_network: nullable(edit.phone_network),
+    phone: nullable(edit.phone),
+    phone_number: nullable(edit.phone_number),
+    finished_school_name: nullable(edit.finished_school_name),
+    finished_school_country: nullable(edit.finished_school_country),
+    finished_secondary_school_year: nullable(edit.finished_secondary_school_year),
+  };
 }
 
 function Enrollments() {

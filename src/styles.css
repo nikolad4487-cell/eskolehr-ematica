@@ -709,6 +709,11 @@ button:disabled {
   font-size: 18px;
 }
 
+.avatar.photo {
+  object-fit: cover;
+  background: #f4f7f8;
+}
+
 .detail-hero h3 {
   margin: 0 0 8px;
   font-size: 18px;
@@ -760,6 +765,30 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.detail-form h3 {
+  grid-column: 1 / -1;
+  margin: 8px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid #e5ecef;
+  color: #0f485d;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.detail-form h3:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.detail-form .detail-checkbox {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: center;
+  color: #223036;
 }
 
 .detail-form .primary {
