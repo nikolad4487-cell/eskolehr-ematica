@@ -1899,3 +1899,88 @@ select:focus {
 .user-create-fields { border: 0; padding: 0; margin: 0; min-width: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 14px; }
 .user-create-fields label { display: grid; gap: 6px; min-width: 0; }
 .user-create-fields input, .user-create-fields select { width: 100%; min-width: 0; box-sizing: border-box; }
+
+/* Compact application layout for laptop viewports, including display scaling. */
+@media screen and (max-width: 1440px), screen and (max-height: 800px) {
+  .app-shell { font-size: 14px; }
+  .sidebar { gap: 12px; padding: 14px 12px; overflow-y: auto; }
+  .brand { gap: 9px; padding: 8px 6px 14px; }
+  .brand strong { font-size: 19px; }
+  .brand span { font-size: 12px; }
+  .nav-list button { min-height: 38px; padding: 8px; gap: 8px; font-size: 13px; }
+  .sidebar-footer { padding: 10px; gap: 4px; }
+  .sidebar-footer strong { font-size: 13px; }
+  .topbar {
+    position: static;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    min-height: 0;
+    padding: 10px 18px;
+    gap: 6px 12px;
+  }
+  .topbar-main { display: contents; }
+  .breadcrumb-line { display: none; }
+  .section-switcher { grid-column: 1; grid-row: 1; min-width: 0; }
+  .section-switcher button { min-height: 28px; padding-inline: 10px; font-size: 12px; }
+  .topbar-actions { grid-column: 2; grid-row: 1; gap: 8px; }
+  .user-chip { min-width: 0; max-width: 220px; padding: 5px 9px; }
+  .user-chip span { font-size: 10px; }
+  .user-chip strong { font-size: 12px; overflow-wrap: anywhere; }
+  .topbar-actions .icon-text { min-height: 34px; padding: 6px 9px; font-size: 13px; }
+  .main-tabs {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  .main-tabs button { flex-shrink: 0; min-height: 32px; padding-inline: 10px; gap: 5px; font-size: 12px; white-space: nowrap; }
+  .page-title { grid-column: 1 / -1; grid-row: 3; min-width: 0; gap: 8px; }
+  .page-title h1 { font-size: 23px; }
+  .topbar p { grid-column: 1 / -1; grid-row: 4; margin: 0; font-size: 12px; }
+  .content { min-width: 0; padding: 16px 18px 28px; }
+  .stack { gap: 12px; }
+  .panel-header { padding: 11px 14px; gap: 10px; }
+  .panel-header h2 { font-size: 14px; }
+  .create-school-user-form { padding: 12px 14px 14px; gap: 10px; }
+  .user-create-fields { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 12px; }
+  .user-create-fields label { gap: 4px; font-size: 12px; line-height: 1.35; }
+  input, select { min-width: 0; min-height: 36px; padding: 6px 9px; }
+  .primary, .icon-text { min-height: 36px; padding: 7px 11px; }
+  .create-school-user-form .notice { margin: 0; font-size: 12px; line-height: 1.45; }
+  .create-school-user-form > .primary { justify-self: start; align-self: flex-start; }
+  .inline-form, .inline-form.compact { grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); padding: 12px 14px; }
+}
+
+@media screen and (min-width: 981px) and (max-width: 1440px), screen and (min-width: 981px) and (max-height: 800px) {
+  .app-shell, .app-shell.has-subnav { grid-template-columns: 204px minmax(0, 1fr); }
+}
+
+@media screen and (max-width: 1180px) {
+  .user-create-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media screen and (max-width: 980px) {
+  .sidebar { position: static; height: auto; overflow: visible; }
+  .sidebar-footer, .brand span { display: none; }
+  .brand { padding: 2px 4px 8px; }
+  .nav-list { display: flex; flex-direction: row; flex-wrap: nowrap; overflow-x: auto; min-width: 0; }
+  .nav-list button { display: flex; flex-shrink: 0; }
+}
+
+@media screen and (max-width: 640px) {
+  .topbar { grid-template-columns: minmax(0, 1fr); padding-inline: 12px; }
+  .topbar-actions { grid-column: 1; grid-row: 2; flex-direction: row; align-items: center; min-width: 0; }
+  .user-chip { flex: 1; max-width: none; }
+  .main-tabs { grid-row: 3; }
+  .main-tabs button { min-height: 40px; }
+  .page-title { grid-row: 4; }
+  .topbar p { grid-row: 5; }
+  .content { padding: 12px; }
+  .user-create-fields { grid-template-columns: 1fr; }
+  input, select { min-height: 40px; font-size: 16px; }
+  .nav-list button, .primary, .icon-text { min-height: 40px; }
+}

@@ -21,7 +21,7 @@ export default function CreateSchoolUserForm({ schools, adminScope = {}, onCreat
     } catch (error) { setMessage(error.message); }
     finally { setSaving(false); }
   };
-  return <form className="stack" onSubmit={submit}>
+  return <form className="stack create-school-user-form" onSubmit={submit}>
     <fieldset disabled={saving} className="user-create-fields">
       <label>Škola<select aria-label="Škola" name="schoolId" value={form.schoolId} onChange={change} disabled={adminScope.isScoped} required>
         <option value="">Odaberite školu</option>{schools.filter(s => !adminScope.isScoped || s.id === adminScope.schoolId).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
