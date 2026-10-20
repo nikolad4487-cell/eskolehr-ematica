@@ -1,3 +1,5 @@
+import CreateSchoolUserForm from './components/CreateSchoolUserForm';
+import { createSchoolUser } from './lib/createSchoolUser';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowRightLeft,
@@ -3599,6 +3601,7 @@ function AccessManagement() {
     last_name: '',
     email: '',
     password: '',
+    pin: '1234',
   });
   const [selectedSchoolId, setSelectedSchoolId] = useSessionState(
     `${SESSION_PREFIX}:access:selectedSchoolId`,
@@ -3652,23 +3655,13 @@ function AccessManagement() {
     event.preventDefault();
     setMessage('');
     setSaving(true);
-    const { data, error } = await supabase.functions.invoke('create-school-admin', {
-      body: form,
-    });
-
-    if (error || data?.error) {
-      setMessage(await getEdgeFunctionErrorMessage(
-        data,
-        error,
-        'Administratora škole nije moguće stvoriti.'
-      ));
-    } else {
-      setMessage(data?.message ?? 'Administrator škole je stvoren.');
-      setForm({ school_id: '', first_name: '', last_name: '', email: '', password: '' });
-      profiles.reload();
-      ednevnikAdminRoles.reload();
-    }
-    setSaving(false);
+    try {
+      await createSchoolUser(supabase, {schoolId: form.school_id, name: form.first_name, surname: form.last_name, email: form.email, password: form.password, pin: form.pin, roles: ['SCHOOL_ADMIN']});
+      setMessage('Administrator škole je stvoren i povezan s e-Dnevnikom.');
+      setForm({school_id:'', first_name:'', last_name:'', email:'', password:'', pin:'1234'});
+      profiles.reload(); ednevnikAdminRoles.reload();
+    } catch(error) { setMessage(error.message); }
+    finally { setSaving(false); }
   };
 
   const clearProfileAccess = async (profile) => {
@@ -3729,15 +3722,16 @@ function AccessManagement() {
           />
           <input
             type="password"
-            inputMode="numeric"
-            pattern="\d{4}"
-            minLength={4}
-            maxLength={4}
-            placeholder="Početni PIN (4 znamenke)"
+            minLength={6}
+            autoComplete="new-password"
+            aria-label="Privremena lozinka"
+            placeholder="Privremena lozinka (najmanje 6 znakova)"
             value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
             required
           />
+          <input type="password" inputMode="numeric" pattern="\d{4}" minLength={4} maxLength={4} aria-label="Početni PIN" placeholder="Početni PIN (4 znamenke)" value={form.pin} onChange={e => setForm({...form, pin: e.target.value})} required />
+          <p className="notice">Lozinka i PIN su odvojeni. Za prijavu djelatnika u e-Dnevnik koristi se PIN i autentifikator.</p>
           <button className="primary" type="submit" disabled={saving}>
             <UserPlus size={18} />
             <span>{saving ? 'Stvaranje...' : 'Stvori administratora'}</span>
@@ -3794,6 +3788,7 @@ function RoleUsersPanel({ title, profiles, schools, onClearAccess }) {
 }
 
 const STAFF_ROLE_LABELS = {
+  REGISTRAR: 'Školska referada',
   MAIN_ADMIN: 'Glavni administrator',
   SCHOOL_ADMIN: 'Administrator ustanove',
   ADMIN: 'Administrator',
@@ -3864,6 +3859,7 @@ function StaffDirectory({ adminScope = {} }) {
 
     roles.data.forEach((row) => {
       if (row.status && String(row.status).toUpperCase() !== 'ACTIVE') return;
+      if (adminScope.isScoped && row.school_id !== adminScope.schoolId) return;
       if (schoolId && row.school_id !== schoolId) return;
 
       const role = normalizeStaffRole(row.role);
@@ -3898,7 +3894,7 @@ function StaffDirectory({ adminScope = {} }) {
         ].filter(Boolean).join(' ').toLocaleLowerCase('hr').includes(query);
       })
       .sort(compareProfilesByLastName);
-  }, [roles.data, roleFilter, schoolId, schools.data, search]);
+  }, [roles.data, roleFilter, schoolId, schools.data, search, adminScope.isScoped, adminScope.schoolId]);
 
   const availableRoles = useMemo(
     () => [...new Set(roles.data
@@ -3977,6 +3973,9 @@ function StaffDirectory({ adminScope = {} }) {
 
   return (
     <div className="stack">
+      <Panel title="Novi korisnik">
+        <CreateSchoolUserForm schools={schools.data} adminScope={adminScope} onCreated={school => {setSchoolId(school);setRoleFilter('ALL');setSearch('');roles.reload();}} />
+      </Panel>
       {editForm.id && (
         <Panel title="Uredi korisnika">
           <form className="inline-form" onSubmit={saveEdit}>
