@@ -4267,6 +4267,17 @@ function Schools({ adminScope = {} }) {
   const [editForm, setEditForm] = useState({ id: '', name: '', code: '', city: '', email: '', education_level: 'SECONDARY', is_active: true });
   const [message, setMessage] = useState('');
   const [registrySchool, setRegistrySchool] = useState(null);
+  const [registrySection, setRegistrySection] = useState('BASIC');
+  const [registryOpenVersion, setRegistryOpenVersion] = useState(0);
+  const registryPanelRef = useRef(null);
+  useEffect(() => {
+    if (registrySchool) registryPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [registrySchool, registrySection, registryOpenVersion]);
+  const openRegistry = (school, section = 'BASIC') => {
+    setRegistrySchool(school);
+    setRegistrySection(section);
+    setRegistryOpenVersion(version => version + 1);
+  };
 
   const create = async (event) => {
     event.preventDefault();
@@ -4338,7 +4349,7 @@ function Schools({ adminScope = {} }) {
 
   return (
     <div className="stack">
-      {registrySchool && <SchoolRegistryEditor key={registrySchool.id} school={registrySchool} onClose={() => setRegistrySchool(null)} />}
+      {registrySchool && <div ref={registryPanelRef}><SchoolRegistryEditor key={`${registrySchool.id}-${registrySection}-${registryOpenVersion}`} school={registrySchool} initialSection={registrySection} onClose={() => setRegistrySchool(null)} /></div>}
       <Panel title="Nova škola">
         {adminScope.isScoped ? (
           <p className="notice">Administriraš samo aktivnu ustanovu: {adminScope.schoolName || adminScope.schoolId}.</p>
@@ -4394,7 +4405,8 @@ function Schools({ adminScope = {} }) {
             s.is_active ? 'Da' : 'Ne',
             <div className="row-actions" key={`${s.id}-actions`}>
               <button className="small-button" type="button" onClick={() => startEdit(s)}>Uredi</button>
-              <button className="small-button" type="button" onClick={() => setRegistrySchool(s)}>Podaci ustanove</button>
+              <button className="small-button" type="button" onClick={() => openRegistry(s)}>Podaci ustanove</button>
+              <button className="small-button" type="button" onClick={() => openRegistry(s, 'CERTIFICATES')}>Ovjera referade</button>
               <button className="small-button danger" type="button" onClick={() => deleteSchool(s)}>Obriši</button>
             </div>,
           ])} />

@@ -87,7 +87,7 @@ export default function StudentEducationEditor({ studentId }) {
       )}
       {selected && (
         <>
-          <ProgramChange enrollment={selected} onSaved={load} />
+          <h4>Status školovanja za potvrde</h4>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -127,6 +127,7 @@ export default function StudentEducationEditor({ studentId }) {
               Potvrdi status za dokumente referade
             </button>
           </form>
+          <ProgramChange enrollment={selected} onSaved={load} />
           <form
             onSubmit={(e) => {
               e.preventDefault();
