@@ -1,3 +1,13 @@
+import ActiveSchoolSwitcher from './components/registry/ActiveSchoolSwitcher';
+import BulkEnrollment from './components/registry/BulkEnrollment';
+import ControlledYearTransition from './components/registry/ControlledYearTransition';
+import { SchoolPermissions, LinkExistingStaff } from './components/registry/SchoolPermissions';
+import { downloadRows } from './lib/exportData.mjs';
+import CertificateSeals from './components/registry/CertificateSeals';
+import ClassDetailsEditor from './components/registry/ClassDetailsEditor';
+import DocumentArchive from './components/registry/DocumentArchive';
+import StudentEducationEditor from './components/registry/StudentEducationEditor';
+import { SchoolRegistryEditor, StaffRegistryEditor } from './components/registry/RegistryEditors';
 import CreateSchoolUserForm from './components/CreateSchoolUserForm';
 import { createSchoolUser } from './lib/createSchoolUser';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -1145,6 +1155,7 @@ function App() {
             <p>{activeSectionMeta.subtitle}</p>
           </div>
           <div className="topbar-actions">
+            {isAdmin&&<ActiveSchoolSwitcher currentSchoolId={profile?.active_school_id||access?.active_school_id}/>}
             <div className="user-chip">
               <span>Prijavljeni korisnik</span>
               <strong>{getProfileDisplayName(profile ?? session.user.user_metadata ?? { email: session.user.email })}</strong>
@@ -1168,14 +1179,14 @@ function App() {
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'users' && <StaffDirectory adminScope={adminScope} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'textbooks' && <ExtendedAdminModule type="textbooks" />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'enrollments' && <Enrollments />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'education-records' && <ExtendedAdminModule type="education-records" />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'education-records' && <ExtendedAdminModule type="education-records" adminScope={adminScope} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'admissions' && <AdmissionsModule track={admissionsTrack} profile={profile} session={session} access={access} isStudent={false} isManager />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'transfers' && <Transfers />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'weekly-assignments' && <ExtendedAdminModule type="weekly-assignments" />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'transport' && <ExtendedAdminModule type="transport" />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'weekly-assignments' && <ExtendedAdminModule type="weekly-assignments" adminScope={adminScope} />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'transport' && <ExtendedAdminModule type="transport" adminScope={adminScope} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'transition' && <YearTransition />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'sync' && <EdnevnikSync />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'documents' && <ExtendedAdminModule type="documents" />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'documents' && <DocumentArchive />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'certificates' && <YearEndCertificates scopeProfile={profile} isAdmin={isAdmin} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'reports' && <Reports />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'exports' && <ExportsHub />}
@@ -2555,10 +2566,10 @@ function YearEndCertificates({ scopeProfile = null, isAdmin = true }) {
   const downloadCertificateDocument = async (summary) => {
     try {
       const enrichedSummary = enrichSummaryGradeNames(summary, subjectNameMap);
-      const html = buildCertificateHtmlDocument(enrichedSummary);
-      const fileName = buildCertificateFileName(enrichedSummary).replace(/\.pdf$/i, '.html');
-      downloadTextFile(fileName, html, 'text/html;charset=utf-8');
-      setMessage('Dokument je preuzet kao HTML. Otvori ga u pregledniku i od tamo ispiši ili spremi kao PDF.');
+      const bytes = await buildCertificatePdf(enrichedSummary);
+      const url = URL.createObjectURL(new Blob([bytes], {type:'application/pdf'}));
+      const link = document.createElement('a');link.href=url;link.download=buildCertificateFileName(enrichedSummary);link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+      setMessage('PDF je preuzet. Dokument nema kvalificirani elektronički pečat.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Dokument nije moguće generirati.');
     }
@@ -2589,6 +2600,7 @@ function YearEndCertificates({ scopeProfile = null, isAdmin = true }) {
         {message && <p className="notice">{message}</p>}
       </Panel>
 
+      {isAdmin && <CertificateSeals classId={selectedClassId} />}
       <Panel title="Zaključni podaci i svjedodžbe" action={<ExportButton filename="svjedodzbe.csv" rows={exportRows} />}>
         <DataState state={summaries}>
           <Table
@@ -2639,7 +2651,7 @@ function YearEndCertificates({ scopeProfile = null, isAdmin = true }) {
           action={(
             <div className="application-actions">
               <button className="small-button" type="button" onClick={() => openCertificateDocument(selectedSummary)}>Pregled</button>
-              <button className="small-button" type="button" onClick={() => downloadCertificateDocument(selectedSummary)}>Preuzmi HTML</button>
+              <button className="small-button" type="button" onClick={() => downloadCertificateDocument(selectedSummary)}>Preuzmi PDF</button>
               <button className="small-button" type="button" onClick={() => setSelectedSummary(null)}>Zatvori</button>
             </div>
           )}
@@ -2966,11 +2978,17 @@ const EXTENDED_ADMIN_CONFIGS = {
           ['DODATNA_NASTAVA', 'Dodatna nastava'],
           ['RAZREDNIŠTVO', 'Razredništvo'],
           ['OSTALO', 'Ostalo'],
+          ['PRAKTIČNA_NASTAVA','Praktična nastava'],['LABORATORIJSKE_VJEŽBE','Vježbe u praktikumima i laboratorijima'],['ZDRAVSTVENE_VJEŽBE','Zdravstvene vježbe'],
         ],
       },
       { name: 'weekly_hours', type: 'number', placeholder: 'Sati tjedno' },
       { name: 'annual_hours', type: 'number', placeholder: 'Sati godišnje' },
-      { name: 'starts_on', type: 'date', placeholder: 'Od datuma' },
+      { name: 'school_hours', type:'number', placeholder:'Od toga sati u školi' },
+      { name: 'group_count', type:'number', placeholder:'Broj grupa' },
+      { name: 'participant_count', type:'number', placeholder:'Broj polaznika (automatski iz upisa)', readOnly:true },
+      { name: 'program_id', type:'select',source:'programs',placeholder:'Program' },
+      { name: 'category', type:'text',placeholder:'Kategorija ostalog zaduženja' },
+      { name: 'starts_on', type: 'date', placeholder: 'Od datuma', required:true },
       { name: 'ends_on', type: 'date', placeholder: 'Do datuma' },
       { name: 'note', type: 'textarea', placeholder: 'Napomena' },
     ],
@@ -3016,6 +3034,12 @@ const EXTENDED_ADMIN_CONFIGS = {
         options: [['AUTOBUS', 'Autobus'], ['VLAK', 'Vlak'], ['KOMBINIRANO', 'Kombinirano'], ['OSTALO', 'Ostalo']],
       },
       { name: 'carrier', type: 'text', placeholder: 'Prijevoznik' },
+      { name:'subsidy_category',type:'select',placeholder:'Kategorija subvencije',options:[['75','75%'],['100_SOCIAL','100% zajamčena minimalna naknada'],['100_VETERANS','100% branitelji / civilni stradalnici'],['OTHER','Ostalo']] },
+      { name:'benefit_evidence',type:'text',placeholder:'Dokaz / akt nadležnog tijela za posebno pravo' },
+      { name:'valid_until',type:'date',placeholder:'Vrijedi do' },
+      { name:'is_practice',type:'checkbox',placeholder:'Relacija za praksu' },
+      { name:'is_boarding',type:'checkbox',placeholder:'Smještaj u učeničkom domu' },
+      { name:'is_special_transport',type:'checkbox',placeholder:'Poseban prijevoz' },
       { name: 'price', type: 'number', placeholder: 'Cijena' },
       {
         name: 'status',
@@ -3182,32 +3206,36 @@ const EXTENDED_ADMIN_CONFIGS = {
   },
 };
 
-function ExtendedAdminModule({ type }) {
+function ExtendedAdminModule({ type, adminScope = {} }) {
   const config = EXTENDED_ADMIN_CONFIGS[type] ?? EXTENDED_ADMIN_CONFIGS.help;
   const records = useSupabaseQuery(() => loadDetailedRows(config.view, config.table), [config.view, config.table]);
   const schools = useSupabaseQuery(() => supabase.from('schools').select('id,name,is_active').eq('is_active', true).order('name'), []);
-  const years = useSupabaseQuery(() => supabase.from('school_years').select('id,label,name').order('label'), []);
+  const years = useSupabaseQuery(() => supabase.from('school_years').select('id,label,name,school_id').order('label'), []);
   const programs = useSupabaseQuery(() => supabase.from('programs').select('id,name,school_id,is_active').eq('is_active', true).order('name'), []);
-  const subjects = useSupabaseQuery(() => supabase.from('subjects').select('id,name,code').order('name'), []);
+  const subjects = useSupabaseQuery(() => supabase.from('subjects').select('id,name,code,school_id').order('name'), []);
   const classes = useSupabaseQuery(() => supabase.from('v_ematica_class_summary').select('class_id,class_name,school_id,school_name,school_year_id,school_year_label,is_active').eq('is_active', true).order('class_name'), []);
-  const students = useSupabaseQuery(() => supabase.from('v_ematica_students_current').select('registry_student_id,full_name,class_name,school_name').order('full_name'), []);
-  const profiles = useSupabaseQuery(() => supabase.from('user_profiles').select('*').order('email'), []);
-  const [form, setForm] = useState(() => buildExtendedInitialForm(config));
+  const students = useSupabaseQuery(() => supabase.from('v_ematica_students_current').select('registry_student_id,full_name,class_id,class_name,school_id,school_year_id,school_name').order('full_name'), []);
+  const profiles = useSupabaseQuery(() => supabase.from('user_profiles').select('id,name,email,oib,mobile,role,access_role,school_id,active_school_id').order('email'), []);
+  const initial = () => ({...buildExtendedInitialForm(config),...(adminScope.isScoped?{school_id:adminScope.schoolId}:{})});
+  const [form, setForm] = useState(initial);
+  const [editingId, setEditingId] = useState(null);
   const [query, setQuery] = useState('');
+  const [filterYear,setFilterYear]=useState(''),[filterStatus,setFilterStatus]=useState(''),[filterDate,setFilterDate]=useState('');
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    setForm(buildExtendedInitialForm(config));
+    setForm(initial());
+    setEditingId(null);
     setMessage('');
     setQuery('');
   }, [type]);
 
+  useEffect(()=>{if(type==='weekly-assignments'&&form.class_id){let active=true;supabase.from('student_class_enrollments').select('id',{count:'exact',head:true}).eq('class_id',form.class_id).eq('status','ACTIVE').then(r=>{if(active&&!r.error)setForm(old=>({...old,participant_count:r.count||0}))});return()=>{active=false}}},[type,form.class_id]);
   const collections = { schools, years, programs, subjects, classes, students, profiles };
   const filtered = useMemo(() => {
     const value = query.trim().toLowerCase();
-    if (!value) return records.data;
-    return records.data.filter((record) => JSON.stringify(record).toLowerCase().includes(value));
-  }, [records.data, query]);
+    return records.data.filter(record=>(!adminScope.isScoped||record.school_id===adminScope.schoolId)&&(!filterYear||record.school_year_id===filterYear)&&(!filterStatus||record.status===filterStatus)&&(!filterDate||((!record.starts_on||record.starts_on<=filterDate)&&(!record.ends_on||record.ends_on>=filterDate)))&&(!value||JSON.stringify(record).toLowerCase().includes(value)));
+  }, [records.data, query, filterYear, filterStatus, filterDate, adminScope.schoolId, adminScope.isScoped]);
   const exportRows = filtered.map(config.exportRow);
 
   const create = async (event) => {
@@ -3216,21 +3244,24 @@ function ExtendedAdminModule({ type }) {
     const payload = {};
     config.fields.forEach((field) => {
       const rawValue = form[field.name];
-      if (field.type === 'number') {
+      if (field.type === 'checkbox') {
+        payload[field.name] = Boolean(rawValue);
+      } else if (field.type === 'number') {
         payload[field.name] = rawValue === '' || rawValue === null || rawValue === undefined ? null : Number(rawValue);
       } else {
         payload[field.name] = String(rawValue ?? '').trim() || null;
       }
     });
 
-    const { error } = await supabase.from(config.table).insert(payload);
+    const { error } = editingId ? await supabase.from(config.table).update(payload).eq('id',editingId) : await supabase.from(config.table).insert(payload);
     if (error) {
       setMessage(isMissingSchemaError(error) ? getMissingMigrationMessage(config.title) : error.message);
       return;
     }
 
     setMessage('Zapis je spremljen.');
-    setForm(buildExtendedInitialForm(config));
+    setForm(initial());
+    setEditingId(null);
     records.reload();
   };
 
@@ -3248,13 +3279,17 @@ function ExtendedAdminModule({ type }) {
       title={config.title}
       form={
         <form className="inline-form compact" onSubmit={create}>
-          {config.fields.map((field) => renderExtendedField(field, form, setForm, collections))}
-          <button className="primary" type="submit"><CheckCircle2 size={18} /><span>Spremi</span></button>
+          {config.fields.map((field) => <label key={field.name}>{field.placeholder}{renderExtendedField({...field,...(field.name==='school_id'?{required:true,disabled:adminScope.isScoped}:{})}, form, setForm, collections)}</label>)}
+          <button className="primary" type="submit"><CheckCircle2 size={18} /><span>{editingId?'Spremi izmjene':'Spremi'}</span></button>
+          {editingId&&<button className="small-button" type="button" onClick={()=>{setEditingId(null);setForm(initial())}}>Odustani</button>}
         </form>
       }
       toolbar={
         <div className="toolbar">
           <SearchBox value={query} onChange={setQuery} />
+          <select aria-label="Filtriraj školsku godinu" value={filterYear} onChange={e=>setFilterYear(e.target.value)}><option value="">Sve godine</option>{years.data.map(y=><option key={y.id} value={y.id}>{y.label||y.name}</option>)}</select>
+          <select aria-label="Filtriraj status" value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}><option value="">Svi statusi</option>{[...new Set(records.data.map(r=>r.status).filter(Boolean))].map(s=><option key={s}>{s}</option>)}</select>
+          {type==='weekly-assignments'&&<label>Stanje na datum<input type="date" value={filterDate} onChange={e=>setFilterDate(e.target.value)}/></label>}
           <ReloadButton onClick={records.reload} loading={records.loading} />
           <ExportButton rows={exportRows} filename={config.filename} />
         </div>
@@ -3267,6 +3302,7 @@ function ExtendedAdminModule({ type }) {
           rows={filtered.map((record) => [
             ...config.columns.map(([, value]) => value(record)),
             <div className="row-actions" key={`${record.id}-actions`}>
+              <button className="small-button" type="button" onClick={()=>{setEditingId(record.id);setForm(Object.fromEntries(config.fields.map(f=>[f.name,record[f.name]??f.defaultValue??''])));setMessage('')}}>Uredi</button>
               <button className="small-button danger" type="button" onClick={() => remove(record)}>Obriši</button>
             </div>,
           ])}
@@ -3336,12 +3372,15 @@ function buildExtendedInitialForm(config) {
 }
 
 async function loadDetailedRows(viewName, tableName) {
-  const detailed = await supabase.from(viewName).select('*').order('created_at', { ascending: false });
-  if (!detailed.error || viewName === tableName) return detailed;
-  if (!isMissingSchemaError(detailed.error)) return detailed;
-  const basic = await supabase.from(tableName).select('*').order('created_at', { ascending: false });
-  if (!basic.error || !isMissingSchemaError(basic.error)) return basic;
-  return { data: [], error: null };
+  const [detailed, basic] = await Promise.all([
+    supabase.from(viewName).select('*').order('created_at', { ascending: false }),
+    supabase.from(tableName).select('*').order('created_at', { ascending: false }),
+  ]);
+  if (basic.error && !isMissingSchemaError(basic.error)) return basic;
+  if (detailed.error && !isMissingSchemaError(detailed.error)) return detailed;
+  if (basic.error && detailed.error) return basic;
+  const raw = new Map((basic.data || []).map(row => [row.id,row]));
+  return {data:(detailed.data || basic.data || []).map(row=>({...row,...raw.get(row.id)})),error:null};
 }
 
 async function loadStudentsCurrent() {
@@ -3363,16 +3402,19 @@ function renderExtendedField(field, form, setForm, collections) {
   const setValue = (nextValue) => setForm((current) => ({
     ...current,
     [field.name]: nextValue,
-    ...(field.name === 'school_id' ? { program_id: '', class_id: '' } : {}),
+    ...(field.name === 'school_id' ? { program_id: '', class_id: '', school_year_id:'', registry_student_id:'',staff_profile_id:'',subject_id:'' } : {}),
     ...(field.name === 'school_year_id' ? { class_id: '' } : {}),
   }));
   const common = {
     key: field.name,
     value,
     required: Boolean(field.required),
+    disabled: Boolean(field.disabled),
+    readOnly: Boolean(field.readOnly),
     onChange: (event) => setValue(event.target.value),
   };
 
+  if (field.type === 'checkbox') return <input type="checkbox" checked={Boolean(value)} onChange={event=>setValue(event.target.checked)} />;
   if (field.type === 'select') {
     return (
       <select {...common}>
@@ -3396,7 +3438,7 @@ function getExtendedFieldOptions(field, collections, form = {}) {
   const data = collections[field.source]?.data ?? [];
   const activeSchoolIds = new Set((collections.schools?.data ?? []).map((item) => item.id));
   if (field.source === 'schools') return data.filter((item) => item.is_active !== false).map((item) => ({ value: item.id, label: item.name }));
-  if (field.source === 'years') return data.map((item) => ({ value: item.id, label: item.label ?? item.name }));
+  if (field.source === 'years') return data.filter(item=>!form.school_id||item.school_id===form.school_id).map((item) => ({ value: item.id, label: item.label ?? item.name }));
   if (field.source === 'programs') {
     const uniquePrograms = new Map();
     data
@@ -3409,7 +3451,7 @@ function getExtendedFieldOptions(field, collections, form = {}) {
       });
     return [...uniquePrograms.values()].map((item) => ({ value: item.id, label: item.name }));
   }
-  if (field.source === 'subjects') return data.map((item) => ({ value: item.id, label: item.name }));
+  if (field.source === 'subjects') return data.filter(item=>!form.school_id||item.school_id===form.school_id).map((item) => ({ value: item.id, label: item.name }));
   if (field.source === 'classes') {
     return data
       .filter((item) => item.is_active !== false)
@@ -3417,7 +3459,7 @@ function getExtendedFieldOptions(field, collections, form = {}) {
       .filter((item) => !form.school_year_id || item.school_year_id === form.school_year_id)
       .map((item) => ({ value: item.class_id, label: `${item.class_name} - ${item.school_name ?? '-'}` }));
   }
-  if (field.source === 'students') return data.map((item) => ({ value: item.registry_student_id, label: `${item.full_name} - ${item.class_name ?? 'bez razreda'}` }));
+  if (field.source === 'students') return data.filter(item=>(!form.school_id||item.school_id===form.school_id)&&(!form.school_year_id||item.school_year_id===form.school_year_id)&&(!form.class_id||item.class_id===form.class_id)).map((item) => ({ value: item.registry_student_id, label: `${item.full_name} - ${item.class_name ?? 'bez razreda'}` }));
   if (field.source === 'profiles') return data.map((item) => ({ value: item.id, label: getProfileDisplayName(item) }));
   return [];
 }
@@ -3589,7 +3631,7 @@ function AccessManagement() {
   const ednevnikAdminRoles = useSupabaseQuery(
     () => supabase
       .from('user_school_roles')
-      .select('id,user_id,school_id,role,status,user:user_profiles(*)')
+      .select('id,user_id,school_id,role,status,user:user_profiles(id,auth_user_id,name,email,oib,mobile,role,access_role,school_id,active_school_id)')
       .in('role', ['SCHOOL_ADMIN', 'ADMIN', 'MAIN_ADMIN'])
       .order('school_id'),
     []
@@ -3828,7 +3870,7 @@ function StaffDirectory({ adminScope = {} }) {
   const roles = useSupabaseQuery(
     () => supabase
       .from('user_school_roles')
-      .select('id,user_id,school_id,role,status,user:user_profiles(*)')
+      .select('id,user_id,school_id,role,status,user:user_profiles(id,auth_user_id,name,email,oib,mobile,role,access_role,school_id,active_school_id)')
       .order('school_id'),
     []
   );
@@ -3847,6 +3889,8 @@ function StaffDirectory({ adminScope = {} }) {
     mobile: '',
   });
   const [message, setMessage] = useState('');
+  const [registryProfile, setRegistryProfile] = useState(null);
+  const [permissionsProfile, setPermissionsProfile] = useState(null);
 
   useEffect(() => {
     if (adminScope.isScoped && schoolId !== adminScope.schoolId) {
@@ -3973,6 +4017,9 @@ function StaffDirectory({ adminScope = {} }) {
 
   return (
     <div className="stack">
+      {registryProfile && <StaffRegistryEditor key={`${registryProfile.id}:${registryProfile.school_id}`} profile={registryProfile} onClose={() => setRegistryProfile(null)} />}
+      <LinkExistingStaff schoolId={adminScope.isScoped?adminScope.schoolId:schoolId} onSaved={roles.reload}/>
+      {permissionsProfile&&<SchoolPermissions profile={permissionsProfile} onSaved={roles.reload} onClose={()=>setPermissionsProfile(null)}/>}
       <Panel title="Novi korisnik">
         <CreateSchoolUserForm schools={schools.data} adminScope={adminScope} onCreated={school => {setSchoolId(school);setRoleFilter('ALL');setSearch('');roles.reload();}} />
       </Panel>
@@ -4031,6 +4078,8 @@ function StaffDirectory({ adminScope = {} }) {
               <span className="status-badge active" key={`${profile.id}-${profile.school_id}-status`}>Aktivan</span>,
               <div className="row-actions" key={`${profile.id}-${profile.school_id}-actions`}>
                 <button className="small-button" type="button" onClick={() => startEdit(profile)}>Uredi</button>
+                <button className="small-button" type="button" onClick={() => setRegistryProfile(profile)}>Radni i obrazovni podaci</button>
+                <button className="small-button" type="button" onClick={() => setPermissionsProfile(profile)}>Prava u ustanovi</button>
                 <button className="small-button danger" type="button" onClick={() => deleteFromInstitution(profile)}>Obriši</button>
               </div>,
             ])}
@@ -4217,6 +4266,7 @@ function Schools({ adminScope = {} }) {
   const [form, setForm] = useState({ name: '', code: '', city: '', email: '', education_level: 'SECONDARY' });
   const [editForm, setEditForm] = useState({ id: '', name: '', code: '', city: '', email: '', education_level: 'SECONDARY', is_active: true });
   const [message, setMessage] = useState('');
+  const [registrySchool, setRegistrySchool] = useState(null);
 
   const create = async (event) => {
     event.preventDefault();
@@ -4288,6 +4338,7 @@ function Schools({ adminScope = {} }) {
 
   return (
     <div className="stack">
+      {registrySchool && <SchoolRegistryEditor key={registrySchool.id} school={registrySchool} onClose={() => setRegistrySchool(null)} />}
       <Panel title="Nova škola">
         {adminScope.isScoped ? (
           <p className="notice">Administriraš samo aktivnu ustanovu: {adminScope.schoolName || adminScope.schoolId}.</p>
@@ -4312,18 +4363,18 @@ function Schools({ adminScope = {} }) {
       {editForm.id && (
         <Panel title="Uredi školu">
           <form className="inline-form" onSubmit={saveEdit}>
-            <input placeholder="Naziv škole" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required />
-            <input placeholder="Šifra" value={editForm.code} onChange={(e) => setEditForm({ ...editForm, code: e.target.value })} />
+            <input placeholder="Naziv škole" readOnly={adminScope.isScoped} value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required />
+            <input placeholder="Šifra" readOnly={adminScope.isScoped} value={editForm.code} onChange={(e) => setEditForm({ ...editForm, code: e.target.value })} />
             <input placeholder="Grad" value={editForm.city} onChange={(e) => setEditForm({ ...editForm, city: e.target.value })} />
             <input placeholder="E-mail" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} />
-            <select value={editForm.education_level} onChange={(e) => setEditForm({ ...editForm, education_level: e.target.value })}>
+            <select disabled={adminScope.isScoped} value={editForm.education_level} onChange={(e) => setEditForm({ ...editForm, education_level: e.target.value })}>
               <option value="ELEMENTARY">Osnovna škola</option>
               <option value="SECONDARY">Srednja škola</option>
               <option value="HIGHER">Fakultet/visoko učilište</option>
               <option value="OTHER">Ostalo</option>
             </select>
             <label className="checkbox-control">
-              <input type="checkbox" checked={editForm.is_active} onChange={(e) => setEditForm({ ...editForm, is_active: e.target.checked })} />
+              <input type="checkbox" disabled={adminScope.isScoped} checked={editForm.is_active} onChange={(e) => setEditForm({ ...editForm, is_active: e.target.checked })} />
               Aktivna
             </label>
             <button className="primary" type="submit"><CheckCircle2 size={18} /><span>Spremi</span></button>
@@ -4343,6 +4394,7 @@ function Schools({ adminScope = {} }) {
             s.is_active ? 'Da' : 'Ne',
             <div className="row-actions" key={`${s.id}-actions`}>
               <button className="small-button" type="button" onClick={() => startEdit(s)}>Uredi</button>
+              <button className="small-button" type="button" onClick={() => setRegistrySchool(s)}>Podaci ustanove</button>
               <button className="small-button danger" type="button" onClick={() => deleteSchool(s)}>Obriši</button>
             </div>,
           ])} />
@@ -4788,7 +4840,7 @@ function Classes({ adminScope = {} }) {
     if (adminScope.isScoped) query = query.eq('school_id', adminScope.schoolId);
     return query;
   }, [adminScope.schoolId, adminScope.isScoped]);
-  const profiles = useSupabaseQuery(() => supabase.from('user_profiles').select('*').order('email'), []);
+  const profiles = useSupabaseQuery(() => supabase.from('user_profiles').select('id,name,email,oib,mobile,role,access_role,school_id,active_school_id').order('email'), []);
   const [form, setForm] = useState({
     school_id: '',
     school_year_id: '',
@@ -4908,6 +4960,7 @@ function Classes({ adminScope = {} }) {
 
   return (
     <div className="stack">
+      <ClassDetailsEditor classes={classes.data} />
       <Panel title="Novi razred">
         <form className="inline-form" onSubmit={create}>
           <select value={selectedSchoolId} onChange={(e) => setForm({ ...form, school_id: e.target.value, program_id: '' })} required disabled={adminScope.isScoped}>
@@ -5031,7 +5084,7 @@ function Students({ scopeProfile = null, isAdmin = true }) {
       return matchesSearch && matchesStatus && matchesSync;
     });
   }, [students.data, scopedClasses.data, query, statusFilter, syncFilter, isAdmin]);
-  const selectedStudent = students.data.find((student) => student.registry_student_id === selectedStudentId) ?? filtered[0] ?? null;
+  const selectedStudent = filtered.find((student) => student.registry_student_id === selectedStudentId) ?? filtered[0] ?? null;
   const exportRows = filtered.map((student) => ({
     ucenik: student.full_name,
     oib: student.oib,
@@ -5137,6 +5190,7 @@ function Students({ scopeProfile = null, isAdmin = true }) {
         </Panel>
 
         <StudentDetailPanel
+          isAdmin={isAdmin}
           student={selectedStudent}
           onMessage={setMessage}
           onRefresh={refreshStudents}
@@ -5146,7 +5200,7 @@ function Students({ scopeProfile = null, isAdmin = true }) {
   );
 }
 
-function StudentDetailPanel({ student, onMessage, onRefresh }) {
+function StudentDetailPanel({ student, onMessage, onRefresh, isAdmin }) {
   const classes = useSupabaseQuery(() => supabase.from('v_ematica_class_summary').select('*').order('class_name'), []);
   const [edit, setEdit] = useState(() => buildStudentCardEdit(null));
   const [action, setAction] = useState({ status: '', class_id: '', reason: '' });
@@ -5287,6 +5341,8 @@ function StudentDetailPanel({ student, onMessage, onRefresh }) {
           <strong>{student.citizenship ?? '-'}</strong>
         </div>
       </div>
+
+      {isAdmin && <StudentEducationEditor key={student.registry_student_id} studentId={student.registry_student_id} />}
 
       <form className="detail-form" onSubmit={save}>
         <h3>Osobni podaci</h3>
@@ -5656,6 +5712,7 @@ function Enrollments() {
 
   return (
     <div className="stack">
+      <BulkEnrollment students={unassignedStudents} classes={classes.data} onSaved={()=>{students.reload();enrollments.reload();classes.reload()}}/>
       <Panel title="Upis učenika u razred">
         <form className="inline-form compact" onSubmit={enroll}>
           <select value={form.registry_student_id} onChange={(e) => setForm({ ...form, registry_student_id: e.target.value })} required>
@@ -5969,6 +6026,7 @@ function YearTransition() {
 
   return (
     <div className="stack">
+      <ControlledYearTransition classes={classes.data} onSaved={()=>{candidates.reload();students.reload();classes.reload()}}/>
       <Panel title="Pokretanje prijelaza">
         <div className="inline-form">
           <select value={fromYear} onChange={(e) => setFromYear(e.target.value)}>
@@ -5979,10 +6037,6 @@ function YearTransition() {
             <option value="">U školsku godinu</option>
             {years.data.map((year) => <option key={year.id} value={year.id}>{year.label ?? year.name}</option>)}
           </select>
-          <button className="primary" type="button" onClick={runTransition} disabled={!fromYear || !toYear}>
-            <RefreshCw size={18} />
-            <span>Pokreni</span>
-          </button>
           <button className="icon-text" type="button" onClick={prepareClasses} disabled={!fromYear || !toYear}>
             <School size={18} />
             <span>Pripremi razrede</span>
@@ -6064,7 +6118,7 @@ function YearTransition() {
 function EdnevnikSync() {
   const sync = useSupabaseQuery(() => supabase.from('v_ematica_sync_status').select('*').order('full_name'), []);
   const students = useSupabaseQuery(() => supabase.from('registry_students').select('id, first_name, last_name, email, ednevnik_student_id').order('last_name'), []);
-  const profiles = useSupabaseQuery(() => supabase.from('user_profiles').select('*').order('email'), []);
+  const profiles = useSupabaseQuery(() => supabase.from('user_profiles').select('id,name,email,oib,mobile,role,access_role,school_id,active_school_id').order('email'), []);
   const classes = useSupabaseQuery(() => supabase.from('v_ematica_class_summary').select('*').order('class_name'), []);
   const [form, setForm] = useState({ registry_student_id: '', ednevnik_student_id: '' });
   const [pullForm, setPullForm] = useState({ class_id: '' });
@@ -6333,12 +6387,7 @@ function ReloadButton({ onClick, loading }) {
 }
 
 function ExportButton({ rows, filename, label = 'Izvezi' }) {
-  return (
-    <button className="icon-text" type="button" onClick={() => downloadCsv(filename, rows)} disabled={!rows?.length}>
-      <Download size={18} />
-      <span>{label}</span>
-    </button>
-  );
+  return <span className="row-actions"><button className="icon-text" type="button" onClick={()=>downloadRows(rows,filename,'csv')} disabled={!rows?.length}><Download size={18}/><span>{label.replace(/CSV/i,'').trim()} CSV</span></button><button className="icon-text" type="button" onClick={()=>downloadRows(rows,filename,'xlsx')} disabled={!rows?.length}>XLSX</button></span>;
 }
 
 function SearchBox({ value, onChange }) {
@@ -6419,14 +6468,17 @@ function enrichSummaryGradeNames(summary, subjectNameMap = {}) {
 }
 
 async function buildCertificatePdf(summary) {
-  const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
+  const { PDFDocument, rgb } = await import('pdf-lib');
+  const {default:fontkit} = await import('@pdf-lib/fontkit');
   const pdfDoc = await PDFDocument.create();
   const page = pdfDoc.addPage([595.28, 841.89]);
   const width = page.getWidth();
   const height = page.getHeight();
   const margin = 42;
-  const regular = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  pdfDoc.registerFontkit(fontkit);
+  const fonts = await Promise.all(['/fonts/NotoSans-Regular.ttf','/fonts/NotoSans-Bold.ttf'].map(async path=>{const response=await fetch(path);if(!response.ok)throw new Error('Font za hrvatske znakove nije dostupan.');return response.arrayBuffer()}));
+  const regular = await pdfDoc.embedFont(fonts[0],{subset:true});
+  const bold = await pdfDoc.embedFont(fonts[1],{subset:true});
   const kind = detectCertificateKind(summary);
   const palette = getCertificatePalette(kind, rgb);
   const lineColor = rgb(0.72, 0.75, 0.8);
@@ -6523,6 +6575,17 @@ async function buildCertificatePdf(summary) {
   });
   drawText(details.formCode, width - margin - 42, 28, { size: 7.2, color: mutedColor });
 
+  if(summary?.certificate_status!=='ISSUED')page.drawText('PROBNI ISPIS — DOKUMENT NIJE IZDAN',{x:130,y:60,font:bold,size:10,color:rgb(.65,.15,.15)});
+  const shown=kind==='YEAR_END'?26:kind==='EXAM_CONFIRMATION'?10:grades.length;
+  for(let start=shown;start<grades.length;start+=32){
+    const extra=pdfDoc.addPage([595.28,841.89]);
+    extra.drawText('PRILOG — NASTAVAK POPISA PREDMETA',{x:50,y:790,font:bold,size:12});
+    extra.drawText(details.studentName,{x:50,y:765,font:regular,size:11});
+    extra.drawText(`${details.schoolName} · ${details.schoolYearLabel}`,{x:50,y:745,font:regular,size:9});
+    extra.drawText(`${details.classaLine} · ${details.urbrojLine}`,{x:50,y:727,font:regular,size:8});
+    grades.slice(start,start+32).forEach((g,i)=>{const text=`${getGradeSubjectLabel(g,start+i)}: ${toCroatianGradeLabel(g.value??g.grade??'—')}`;let size=10;while(size>5.5&&regular.widthOfTextAtSize(text,size)>495)size-=.25;if(regular.widthOfTextAtSize(text,size)>495)throw new Error('Naziv predmeta je predug.');extra.drawText(text,{x:50,y:700-i*18,font:regular,size})});
+    extra.drawText('Prilog pripada dokumentu s navedenom klasom i urudžbenim brojem.',{x:50,y:65,font:regular,size:8});
+  }
   return pdfDoc.save();
 }
 
@@ -6569,30 +6632,32 @@ function normalizeCertificateDetails(summary) {
     studentName: summary?.full_name ?? 'Nepoznat učenik',
     studentOib: summary?.oib ?? '___________',
     dateOfBirth: summary?.date_of_birth ?? payload.date_of_birth ?? null,
-    birthPlace: summary?.city ?? payload.birth_place ?? '________________',
+    birthPlace: summary?.birth_place ?? payload.birth_place ?? '________________',
+    birthCountry: summary?.birth_country ?? payload.birth_country ?? '________________',
+    citizenship: summary?.citizenship ?? payload.citizenship ?? '________________',
     parentGuardianName: summary?.parent_guardian_name ?? payload.parent_guardian_name ?? '________________',
     className: summary?.class_name ?? '-',
     classLevelText: getClassLevelText(summary?.class_name ?? payload.class_name ?? summary?.grade_level),
     programName: payload.program_name ?? payload.qualification_name ?? 'programa obrazovanja',
     qualificationName: payload.qualification_name ?? payload.program_name ?? '',
-    schoolNameCity: payload.school_city ?? summary?.city ?? 'Zagreb',
+    schoolNameCity: payload.school_city ?? '________________',
     finalSuccessText: summary?.final_success_text ?? payload.final_success_text ?? '-',
     finalAverage: summary?.final_grade_average ?? payload.final_average ?? '-',
     certificateNumber: summary?.certificate_number ?? '',
-    issueDateText: formatDate(summary?.issued_at ?? new Date()),
-    cityText: payload.issue_city ?? 'Zagreb',
+    issueDateText: formatDate(summary?.issued_at ?? payload.certificate_date ?? null),
+    cityText: payload.issue_city ?? payload.school_city ?? '________________',
     gender,
     genderText: getGenderDisplayText(gender),
     classaLine: `KLASA: ${payload.classa ?? '______________'}`,
     urbrojLine: `URBROJ: ${payload.urbroj ?? '______________'}`,
     leftReferenceLine: payload.student_registry_number ? `Matični broj učenika: ${payload.student_registry_number}` : `Školska godina: ${summary?.school_year_label ?? '-'}`,
-    absencesLine: payload.absences_line ?? 'Ukupno izostanaka: 0 sati; od toga neopravdano: 0 sati',
-    behaviorLine: payload.behavior_line ?? 'Vladanje: uzorno',
+    absencesLine: payload.absences_line ?? 'Izostanci nisu evidentirani',
+    behaviorLine: payload.behavior_line ?? 'Vladanje nije evidentirano',
     leftSignerRole: payload.left_signer_role ?? 'Razrednik',
     leftSignerName: payload.left_signer_name ?? '',
     rightSignerName: payload.right_signer_name ?? '',
-    finalWorkMadeGrade: payload.final_work_written_grade ?? 'odličan (5)',
-    finalWorkDefenseGrade: payload.final_work_defense_grade ?? 'odličan (5)',
+    finalWorkMadeGrade: payload.final_work_written_grade ?? 'nije evidentirano',
+    finalWorkDefenseGrade: payload.final_work_defense_grade ?? 'nije evidentirano',
     examTypeLabel: payload.exam_type_label ?? 'Razlikovni ispit/Dopunski ispit',
     examPeriodLabel: payload.exam_period_label ?? '',
     examGradeLevelLabel: payload.exam_grade_level_label ?? '',
@@ -6606,11 +6671,8 @@ function resolveStudentGender(summary, payload) {
   const raw = String(
     payload.gender ?? payload.sex ?? payload.spol ?? summary?.gender ?? summary?.sex ?? summary?.spol ?? ''
   ).trim().toUpperCase();
-  const firstName = String(summary?.first_name ?? summary?.full_name?.split(' ')?.[0] ?? '').trim().toLowerCase();
-  const femaleNames = ['ana', 'anita', 'ema', 'ksenija', 'marija', 'marijana', 'patricija', 'vanesa'];
-  const isFemale = ['F', 'Z', 'Ž', 'ŽENSKO', 'ZENSKO', 'FEMALE'].includes(raw) || femaleNames.includes(firstName);
-  const key = isFemale ? 'F' : 'M';
-  return { key, display: key === 'F' ? 'Ž' : 'M', words: getGenderedCertificateWords(key) };
+  const key = ['F','Z','Ž','ŽENSKO','ZENSKO','FEMALE'].includes(raw)?'F':['M','MUŠKO','MUSKO','MALE'].includes(raw)?'M':null;
+  return {key,display:key==='F'?'Ž':key==='M'?'M':'',words:getGenderedCertificateWords(key)};
 }
 
 function getGenderDisplayText(gender) {
@@ -6619,6 +6681,7 @@ function getGenderDisplayText(gender) {
 
 function getGenderedCertificateWords(gender) {
   const key = typeof gender === 'string' ? gender : gender?.key;
+  if (!key) return {student:'Učenik/ca',studentLower:'učenik/ca',born:'rođen/a',enrolled:'upisao/la',achieved:'postigao/la',finished:'završio/la',acquired:'stekao/la'};
   if (key === 'F') {
     return {
       student: 'Učenica',
@@ -6645,14 +6708,14 @@ function buildCertificateNarrative(details, kind) {
   const words = getGenderedCertificateWords(details.gender);
   if (kind === 'FINAL_WORK') {
     return [
-      `${words.born} ${formatDate(details.dateOfBirth) || '____________'} godine u ${details.birthPlace}, Republika Hrvatska, državljanstvo Republike Hrvatske,`,
+      `${words.born} ${formatDate(details.dateOfBirth) || '____________'} godine u ${details.birthPlace}, ${details.birthCountry}, državljanstvo ${details.citizenship},`,
       `ime i prezime roditelja/skrbnika: ${details.parentGuardianName}. Nakon završenoga razreda ${words.studentLower} je ${words.acquired} uvjete`,
       `za obranu završnog rada i ${words.achieved} sljedeći uspjeh:`,
     ];
   }
   if (kind === 'EXAM_CONFIRMATION') {
     return [
-      `${words.born} ${formatDate(details.dateOfBirth) || '____________'} godine u ${details.birthPlace}, Republika Hrvatska, državljanstvo hrvatsko`,
+      `${words.born} ${formatDate(details.dateOfBirth) || '____________'} godine u ${details.birthPlace}, ${details.birthCountry}, državljanstvo ${details.citizenship}`,
       `Vrsta ispita: ${details.examTypeLabel}`,
       `Razdoblje polaganja ispita: ${details.examPeriodLabel || '________________'}.`,
       `Naziv programa obrazovanja prema kojem se ispit polaže: ${details.programName}.`,
@@ -6660,7 +6723,7 @@ function buildCertificateNarrative(details, kind) {
     ];
   }
   return [
-    `${words.born} ${formatDate(details.dateOfBirth) || '____________'} godine u ${details.birthPlace}, Republika Hrvatska, državljanstvo Republike Hrvatske,`,
+    `${words.born} ${formatDate(details.dateOfBirth) || '____________'} godine u ${details.birthPlace}, ${details.birthCountry}, državljanstvo ${details.citizenship},`,
     `ime i prezime roditelja/skrbnika: ${details.parentGuardianName}, ${words.enrolled} je školske godine ${details.schoolYearLabel || '____________'}`,
     `razred programa obrazovanja ${details.programName} i ${words.achieved} sljedeći uspjeh:`,
   ];
@@ -6707,15 +6770,16 @@ function drawYearEndCertificateBody(page, drawText, drawLine, regular, bold, rgb
 
   page.drawRectangle({ x: leftX, y: tableTop - tableHeight, width: tableWidth, height: tableHeight, borderColor: lineColor, borderWidth: 1 });
   page.drawLine({ start: { x: splitX, y: tableTop }, end: { x: splitX, y: tableTop - tableHeight }, thickness: 1, color: lineColor });
-  drawText('Obvezni predmeti', leftX + 8, tableTop - 18, { size: 10, font: bold });
-
-  let currentY = tableTop - 42;
-  grades.slice(0, 13).forEach((grade, index) => {
-    drawLeaderLine(page, leftX + 8, splitX - 14, currentY + 3, rgb(0.45, 0.45, 0.48));
-    page.drawRectangle({ x: splitX + 8, y: currentY - 9, width: tableWidth - (splitX - leftX) - 16, height: 1, color: rgb(0.95, 0.97, 0.98) });
-    drawText(getGradeSubjectLabel(grade, index), leftX + 8, currentY, { size: 9.6, font: regular });
-    drawText(toCroatianGradeLabel(grade.value ?? grade.grade ?? '-'), splitX - 96, currentY, { size: 9.6, font: regular });
-    currentY -= 20;
+  drawText('Nastavni predmeti', leftX + 8, tableTop - 18, {size:10,font:bold});
+  drawText('Nastavni predmeti — nastavak', splitX + 8, tableTop - 18, {size:9,font:bold});
+  grades.slice(0,26).forEach((grade,index)=>{
+    const column=index<13?0:1,row=index%13,currentY=tableTop-42-row*18;
+    const x=column===0?leftX+8:splitX+8,gradeX=column===0?splitX-52:leftX+tableWidth-52;
+    const label=getGradeSubjectLabel(grade,index);let size=9;
+    while(size>5.5&&regular.widthOfTextAtSize(label,size)>gradeX-x-6)size-=.25;
+    if(regular.widthOfTextAtSize(label,size)>gradeX-x-6)throw new Error('Naziv predmeta je predug za ispis svjedodžbe.');
+    drawText(label,x,currentY,{size,font:regular});
+    drawText(String(grade.value??grade.grade??'—'),gradeX,currentY,{size:9,font:regular});
   });
 
   y = tableTop - tableHeight - 18;
@@ -6727,9 +6791,9 @@ function drawYearEndCertificateBody(page, drawText, drawLine, regular, bold, rgb
 }
 
 function drawFinalWorkCertificateBody(page, drawText, regular, bold, rgb, details, width, height, margin, y, palette) {
-  drawText(`Izrada zavr?nog rada........................ ${details.finalWorkMadeGrade}`, width / 2 - 86, y - 12, { size: 10.6, font: bold });
-  drawText(`Obrana zavr?nog rada....................... ${details.finalWorkDefenseGrade}`, width / 2 - 86, y - 48, { size: 10.6, font: bold });
-  drawCenteredText(page, 'OP?I USPJEH', width / 2, y - 96, bold, 17, rgb(0.28, 0.24, 0.18));
+  drawText(`Izrada završnog rada........................ ${details.finalWorkMadeGrade}`, width / 2 - 86, y - 12, { size: 10.6, font: bold });
+  drawText(`Obrana završnog rada....................... ${details.finalWorkDefenseGrade}`, width / 2 - 86, y - 48, { size: 10.6, font: bold });
+  drawCenteredText(page, 'OPĆI USPJEH', width / 2, y - 96, bold, 17, rgb(0.28, 0.24, 0.18));
   drawCenteredText(page, String(details.finalSuccessText).toLowerCase(), width / 2, y - 126, bold, 15, rgb(0.28, 0.24, 0.18));
   drawCenteredText(page, `${details.gender.words.student} je ${details.gender.words.acquired} zanimanje/kvalifikaciju`, width / 2, y - 168, regular, 10.4, rgb(0.28, 0.24, 0.18));
   drawCenteredText(page, details.qualificationName || details.programName, width / 2, y - 198, bold, 15, rgb(0.28, 0.24, 0.18));
@@ -6765,7 +6829,10 @@ function drawLeaderLine(page, x1, x2, y, color) {
 
 function drawCenteredText(page, text, centerX, y, font, size, color) {
   const safeText = String(text ?? '');
+  const available=page.getWidth()-100;
+  while(size>6.5&&font.widthOfTextAtSize(safeText,size)>available)size-=.25;
   const textWidth = font.widthOfTextAtSize(safeText, size);
+  if(textWidth>available)throw new Error('Tekst je predug za ispis dokumenta.');
   page.drawText(safeText, { x: centerX - textWidth / 2, y, size, font, color });
 }
 

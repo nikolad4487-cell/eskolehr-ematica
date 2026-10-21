@@ -1984,3 +1984,9 @@ select:focus {
   input, select { min-height: 40px; font-size: 16px; }
   .nav-list button, .primary, .icon-text { min-height: 40px; }
 }
+.registry-editor .registry-body { padding: 18px; }
+.registry-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
+.registry-tabs button { white-space: normal; }
+.registry-array { border: 1px solid #d4dfe6; padding: 12px; margin: 12px 0; border-radius: 8px; min-width: 0; }
+.registry-editor form > .primary { margin: 16px 8px 16px 0; }
+.registry-editor input[type=checkbox] { width: 18px; height: 18px; min-height: 18px; }

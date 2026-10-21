@@ -1,0 +1,199 @@
+import { createRequire } from "node:module";
+import { dirname, resolve, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { tmpdir } from "node:os";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { createServer } from "node:http";
+import assert from "node:assert/strict";
+const require = createRequire(new URL("../package.json", import.meta.url));
+const { build } = require("esbuild");
+const { chromium } = await import("playwright-core");
+const root = resolve(dirname(fileURLToPath(import.meta.url)), ".."),
+  out = join(tmpdir(), "skolehr-browser-ematica");
+await mkdir(out, { recursive: true });
+const entry = `import React,{useState} from 'react';import{createRoot}from'react-dom/client';import{SchoolRegistryEditor,StaffRegistryEditor}from'${root}/src/components/registry/RegistryEditors.jsx';import StudentEducationEditor from'${root}/src/components/registry/StudentEducationEditor.jsx';import ClassDetailsEditor from'${root}/src/components/registry/ClassDetailsEditor.jsx';window.__calls=[];function App(){const[mode,setMode]=useState('school');return <main className="workspace"><nav>{['school','staff','student','class'].map(x=><button key={x} onClick={()=>setMode(x)}>{x}</button>)}</nav>{mode==='school'?<SchoolRegistryEditor school={{id:'a',name:'Ogledna škola A',type:'SECONDARY',oib:'12345678901'}} onClose={()=>{}}/>:mode==='staff'?<StaffRegistryEditor profile={{id:'teacher',school_id:'a',name:'Ogledni Nastavnik'}} onClose={()=>{}}/>:mode==='student'?<StudentEducationEditor studentId="student"/>:<ClassDetailsEditor classes={[{class_id:'class-a',class_name:'3.A',school_name:'Ogledna škola A',school_year_label:'2026./2027.'}]}/>}</main>}createRoot(document.getElementById('root')).render(<App/>);`;
+const mock = `const result=(data)=>Promise.resolve({data,error:null});export const supabase={from(table){const data=table==='subjects'?[{id:'math',name:'Matematika'}]:table==='classes'?{id:'class-a',variant:'REGULAR'}:[];const q={select(){return q},eq(){return q},order(){return q},single(){return q},then(a,b){return result(data).then(a,b)}};return q},rpc:async(name,args)=>{window.__calls.push({name,args});const e={id:'enrollment',student_id:'profile',registry_student_id:'student',school_id:'a',year_name:'2026./2027.',class_name:'3.A',status:'ACTIVE',school_year_id:'year',education_details:{},program_name:'Program'};let data=null;if(name==='registry_global_admin')data=true;else if(name==='registry_attestation_settings')data={};else if(name==='registry_student_enrollments')data=[e];else if(name==='registry_special_exams')data=[];else if(name==='registry_program_targets')data={schools:[{id:'a',name:'Ogledna škola A'},{id:'b',name:'Umjetnička škola B'}],classes:[{id:'class-b',name:'1.A',school_year:'2026./2027.'}],programs:[{id:'art',name:'Glazbeni program'}]};return {data,error:null}}};`;
+const bundle = await build({
+  stdin: { contents: entry, resolveDir: root, loader: "jsx" },
+  bundle: true,
+  format: "esm",
+  write: false,
+  plugins: [
+    {
+      name: "mock-db",
+      setup(b) {
+        b.onResolve({ filter: /supabase$/ }, () => ({
+          path: "db",
+          namespace: "mock",
+        }));
+        b.onLoad({ filter: /.*/, namespace: "mock" }, () => ({
+          contents: mock,
+          loader: "js",
+        }));
+      },
+    },
+  ],
+});
+const css = await readFile(root + "/src/styles.css");
+const server = createServer((req, res) => {
+  if (req.url === "/app.js") {
+    res.setHeader("Content-Type", "text/javascript");
+    res.end(bundle.outputFiles[0].contents);
+  } else if (req.url === "/style.css") {
+    res.setHeader("Content-Type", "text/css");
+    res.end(css);
+  } else
+    res.end(
+      '<html lang="hr"><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"></head><body><div id="root"></div><script type="module" src="/app.js"></script></body></html>',
+    );
+});
+await new Promise((r) => server.listen(4326, "127.0.0.1", r));
+const browser = await chromium.launch({
+  executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium",
+  headless: true,
+  args: ["--no-sandbox", "--disable-dev-shm-usage"],
+});
+const page = await browser.newPage({ viewport: { width: 1366, height: 768 } });
+const errors = [];
+page.on("pageerror", (e) => errors.push(e.message));
+page.on("console", (m) => {
+  if (m.type() === "error") errors.push(m.text());
+});
+await page.route("**/*", (r) =>
+  new URL(r.request().url()).hostname === "127.0.0.1"
+    ? r.continue()
+    : r.abort(),
+);
+try {
+  await page.goto("http://127.0.0.1:4326");
+  await page
+    .getByRole("button", { name: "Spremi podatke ustanove", exact: true })
+    .waitFor();
+  await page.getByLabel("Telefon", { exact: true }).fill("012345678");
+  await page
+    .getByRole("button", { name: "Spremi podatke ustanove", exact: true })
+    .click();
+  await page.getByText("Podaci ustanove su spremljeni.").waitFor();
+  for (const name of [
+    "O ustanovi",
+    "Temeljna dokumentacija",
+    "Infrastruktura",
+    "Programi",
+    "Fakultativni predmeti",
+    "Djelatnici",
+    "Ostalo",
+    "Svjedodžbe",
+  ])
+    await page.getByRole("button", { name, exact: true }).click();
+  assert.equal(
+    await page
+      .getByText("Imenovanje administratora predškolske ustanove")
+      .count(),
+    0,
+  );
+  for (const viewport of [
+    { width: 1280, height: 720 },
+    { width: 1366, height: 768 },
+    { width: 1920, height: 1080 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    assert.equal(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > innerWidth,
+      ),
+      false,
+      JSON.stringify(viewport),
+    );
+    await page.screenshot({
+      path: out + "/ematica-" + viewport.width + ".png",
+      fullPage: true,
+    });
+  }
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.getByRole("button", { name: "student", exact: true }).click();
+  await page
+    .getByLabel("Status školovanja", { exact: false })
+    .selectOption("REGULAR");
+  await page
+    .getByLabel("Osnova provjere", { exact: false })
+    .fill("Provjeren upisni dokument");
+  await page
+    .getByRole("button", {
+      name: "Potvrdi status za dokumente referade",
+      exact: true,
+    })
+    .click();
+  await page.getByText("Podaci su spremljeni.", { exact: true }).waitFor();
+  await page.getByLabel("Ciljna ustanova", { exact: false }).selectOption("b");
+  await page
+    .getByLabel("Ciljni razred", { exact: false })
+    .selectOption("class-b");
+  await page.getByLabel("Novi program", { exact: false }).selectOption("art");
+  await page.getByLabel("Datum početka novog razdoblja").fill("2026-10-21");
+  await page
+    .getByLabel("Osnova / razlog promjene")
+    .fill("Rješenje o paralelnom upisu");
+  await page
+    .getByLabel("Paralelni umjetnički program", { exact: true })
+    .check();
+  await page
+    .getByRole("button", { name: "Spremi novi upis i povijest" })
+    .click();
+  await page
+    .getByText(
+      "Novi upis je spremljen; prethodno razdoblje ostalo je u povijesti.",
+    )
+    .waitFor();
+  const calls = await page.evaluate(() => window.__calls);
+  assert(
+    calls.some(
+      (x) =>
+        x.name === "registry_verify_enrollment" &&
+        x.args._enrollment === "enrollment" &&
+        x.args._mode === "REGULAR",
+    ),
+  );
+  assert(
+    calls.some(
+      (x) =>
+        x.name === "registry_change_program" &&
+        x.args._class === "class-b" &&
+        x.args._parallel === true,
+    ),
+  );
+  await page.getByRole("button", { name: "class", exact: true }).click();
+  await page.getByLabel("Razred / skupina").selectOption("class-a");
+  await page.getByLabel("Vrsta odjela").selectOption("COMBINED");
+  await page.getByLabel("1. razred", { exact: true }).check();
+  await page.getByLabel("2. razred", { exact: true }).check();
+  await page.getByRole("button", { name: "Spremi podatke odjela" }).click();
+  await page.getByText("Podaci razrednog odjela su spremljeni.").waitFor();
+  assert.deepEqual(errors, []);
+  const report = {
+    passed: true,
+    mocked_data: true,
+    checks: [
+      "all nine institution tabs",
+      "school form saves selected institution",
+      "preschool forms hidden in secondary school",
+      "verified status linked to exact enrollment",
+      "parallel art transfer selects another authorized institution",
+      "combined class levels saved",
+      "no horizontal overflow at 1280,1366,1920,390",
+      "no React errors",
+    ],
+  };
+  await writeFile(
+    out + "/ematica-report.json",
+    JSON.stringify(report, null, 2),
+  );
+  console.log(JSON.stringify(report));
+} catch (e) {
+  console.log(errors, await page.locator("body").innerText());
+  await page.screenshot({ path: out + "/ematica-failure.png", fullPage: true });
+  throw e;
+} finally {
+  await browser.close();
+  await new Promise((r) => server.close(r));
+}
