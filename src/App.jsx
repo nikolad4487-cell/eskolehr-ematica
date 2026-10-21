@@ -1,3 +1,4 @@
+import ExpertWorkspace from './components/registry/ExpertWorkspace';
 import ActiveSchoolSwitcher from './components/registry/ActiveSchoolSwitcher';
 import BulkEnrollment from './components/registry/BulkEnrollment';
 import BulkSchoolingVerification from './components/registry/BulkSchoolingVerification';
@@ -659,12 +660,13 @@ function App() {
               .from('user_school_roles')
               .select('school_id,role,status')
               .eq('user_id', data.id)
-              .in('role', ['SCHOOL_ADMIN', 'ADMIN', 'MAIN_ADMIN']),
+              .in('role', ['SCHOOL_ADMIN', 'ADMIN', 'MAIN_ADMIN', 'EXPERT']),
             'Učitavanje administratorskih uloga iz e-Dnevnika'
           );
           const ednevnikAdminRole = (schoolRoles ?? []).find(
-            (item) => !item.status || String(item.status).toUpperCase() === 'ACTIVE'
+            (item) => item.role !== 'EXPERT' && (!item.status || String(item.status).toUpperCase() === 'ACTIVE')
           );
+          const expertRole = (schoolRoles ?? []).find(item => item.role === 'EXPERT' && item.status === 'ACTIVE');
           let roleSchool = null;
           if (ednevnikAdminRole?.school_id) {
             const { data: schoolData } = await withTimeout(
@@ -682,7 +684,8 @@ function App() {
             profile_id: accessData?.profile_id ?? data.id,
             auth_user_id: accessData?.auth_user_id ?? data.auth_user_id,
             email: accessData?.email ?? data.email,
-            active_school_id: accessData?.active_school_id ?? ednevnikAdminRole?.school_id ?? null,
+            active_school_id: accessData?.active_school_id ?? ednevnikAdminRole?.school_id ?? expertRole?.school_id ?? null,
+            is_expert: Boolean(expertRole),
             active_school_name: accessData?.active_school_name ?? roleSchool?.name ?? null,
             active_school_level: accessData?.active_school_level ?? roleSchool?.education_level ?? null,
             is_school_admin: Boolean(accessData?.is_school_admin || ednevnikAdminRole),
@@ -706,11 +709,12 @@ function App() {
     loadProfile();
   }, [session?.user?.id]);
 
-  const isStudent = access?.is_student || isStudentProfile(profile);
+  const isExpert = Boolean(access?.is_expert || String(profile?.role).toUpperCase() === 'EXPERT');
+  const isStudent = !isExpert && (access?.is_student || isStudentProfile(profile));
   const isTeacher = isTeacherProfile(profile, access);
-  const isAdmin = isAdminProfile(profile, access);
+  const isAdmin = !isExpert && isAdminProfile(profile, access);
   const isSuperAdmin = isSuperAdminProfile(profile, access);
-  const isHomeroomTeacher = Boolean(access?.is_homeroom_teacher);
+  const isHomeroomTeacher = !isExpert && Boolean(access?.is_homeroom_teacher);
   const forcedSection = getForcedSectionFromHost();
   const activeSchoolLevel = getActiveSchoolLevel(profile, access, studentRecord);
 
@@ -771,7 +775,7 @@ function App() {
     loadStudentRecord();
   }, [isStudent, profile?.id, session?.user?.id, session?.user?.email]);
 
-  const canUseEmatica = isAdmin || isHomeroomTeacher;
+  const canUseEmatica = isAdmin || isHomeroomTeacher || isExpert;
   const admissionsTrack = getAdmissionsTrack(profile, access);
   const canUseSecondaryAdmissions = isStudent
     ? isSecondaryAdmissionsEligibleStudent(studentRecord, activeSchoolLevel)
@@ -985,7 +989,7 @@ function App() {
     ? EMATICA_NAV_ITEMS
     : EMATICA_NAV_ITEMS.filter((item) => item.id !== 'access');
   const navItems = activeSection === APP_SECTIONS.ematica.id
-    ? (canUseEmaticaInApp ? (isAdmin ? adminNavItems : HOMEROOM_NAV_ITEMS) : LOCKED_NAV_ITEMS)
+    ? (canUseEmaticaInApp ? (isExpert ? [{id:'expert',label:'Stručna služba',icon:BookOpen}] : isAdmin ? adminNavItems : HOMEROOM_NAV_ITEMS) : LOCKED_NAV_ITEMS)
     : (canUseActiveAdmissionsSection ? admissionsNavItems : LOCKED_NAV_ITEMS);
   const groupedNavigation = activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin
     ? EMATICA_NAV_GROUPS
@@ -1169,30 +1173,31 @@ function App() {
         </header>
 
         <section className="content">
-          {activeSection === APP_SECTIONS.ematica.id && !canUseEmaticaInApp && activePage === 'locked' && <AccessLocked section={activeSection} />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'dashboard' && (isAdmin ? <Dashboard onNavigate={setActivePage} isSuperAdmin={isSuperAdmin} /> : <HomeroomDashboard profile={profile} />)}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'schools' && <Schools adminScope={adminScope} />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'years' && <SchoolYears adminScope={adminScope} />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'programs' && <Programs adminScope={adminScope} />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'subjects' && <Subjects adminScope={adminScope} />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'classes' && <Classes adminScope={adminScope} />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'students' && <Students scopeProfile={profile} isAdmin={isAdmin} />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'users' && <StaffDirectory adminScope={adminScope} />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'textbooks' && <ExtendedAdminModule type="textbooks" />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'enrollments' && <Enrollments isAdmin={isAdmin} adminScope={adminScope} />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'education-records' && <ExtendedAdminModule type="education-records" adminScope={adminScope} />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'admissions' && <AdmissionsModule track={admissionsTrack} profile={profile} session={session} access={access} isStudent={false} isManager />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'transfers' && <Transfers />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'weekly-assignments' && <ExtendedAdminModule type="weekly-assignments" adminScope={adminScope} />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'transport' && <ExtendedAdminModule type="transport" adminScope={adminScope} />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'transition' && <YearTransition />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'sync' && <EdnevnikSync />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'documents' && <DocumentArchive />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'certificates' && <YearEndCertificates scopeProfile={profile} isAdmin={isAdmin} />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'reports' && <Reports />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'exports' && <ExportsHub />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'help' && <ExtendedAdminModule type="help" />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isSuperAdmin && activePage === 'access' && <AccessManagement />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isExpert && <ExpertWorkspace />}
+          {activeSection === APP_SECTIONS.ematica.id && !canUseEmaticaInApp && !isExpert && activePage === 'locked' && <AccessLocked section={activeSection} />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && activePage === 'dashboard' && (isAdmin ? <Dashboard onNavigate={setActivePage} isSuperAdmin={isSuperAdmin} /> : <HomeroomDashboard profile={profile} />)}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && isAdmin && activePage === 'schools' && <Schools adminScope={adminScope} />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && isAdmin && activePage === 'years' && <SchoolYears adminScope={adminScope} />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && isAdmin && activePage === 'programs' && <Programs adminScope={adminScope} />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && isAdmin && activePage === 'subjects' && <Subjects adminScope={adminScope} />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && isAdmin && activePage === 'classes' && <Classes adminScope={adminScope} />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && activePage === 'students' && <Students scopeProfile={profile} isAdmin={isAdmin} />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && isAdmin && activePage === 'users' && <StaffDirectory adminScope={adminScope} />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && isAdmin && activePage === 'textbooks' && <ExtendedAdminModule type="textbooks" />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && activePage === 'enrollments' && <Enrollments isAdmin={isAdmin} adminScope={adminScope} />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && isAdmin && activePage === 'education-records' && <ExtendedAdminModule type="education-records" adminScope={adminScope} />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && activePage === 'admissions' && <AdmissionsModule track={admissionsTrack} profile={profile} session={session} access={access} isStudent={false} isManager />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && activePage === 'transfers' && <Transfers />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && isAdmin && activePage === 'weekly-assignments' && <ExtendedAdminModule type="weekly-assignments" adminScope={adminScope} />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && isAdmin && activePage === 'transport' && <ExtendedAdminModule type="transport" adminScope={adminScope} />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && activePage === 'transition' && <YearTransition />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && activePage === 'sync' && <EdnevnikSync />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && isAdmin && activePage === 'documents' && <DocumentArchive />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && activePage === 'certificates' && <YearEndCertificates scopeProfile={profile} isAdmin={isAdmin} />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && isAdmin && activePage === 'reports' && <Reports />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && isAdmin && activePage === 'exports' && <ExportsHub />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && isAdmin && activePage === 'help' && <ExtendedAdminModule type="help" />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && isSuperAdmin && activePage === 'access' && <AccessManagement />}
 
           {activeSection !== APP_SECTIONS.ematica.id && canUseActiveAdmissionsSection && activePage === 'dashboard' && (
             <AdmissionsHome
@@ -3831,6 +3836,7 @@ function RoleUsersPanel({ title, profiles, schools, onClearAccess }) {
 }
 
 const STAFF_ROLE_LABELS = {
+  EXPERT: 'Stručni suradnik',
   REGISTRAR: 'Školska referada',
   MAIN_ADMIN: 'Glavni administrator',
   SCHOOL_ADMIN: 'Administrator ustanove',
