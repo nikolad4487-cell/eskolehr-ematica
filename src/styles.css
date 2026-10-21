@@ -1901,7 +1901,7 @@ select:focus {
 .user-create-fields input, .user-create-fields select { width: 100%; min-width: 0; box-sizing: border-box; }
 
 /* Compact application layout for laptop viewports, including display scaling. */
-@media screen and (max-width: 1440px), screen and (max-height: 800px) {
+@media screen and (max-width: 1600px), screen and (max-height: 900px) {
   .app-shell { font-size: 14px; }
   .sidebar { gap: 12px; padding: 14px 12px; overflow-y: auto; }
   .brand { gap: 9px; padding: 8px 6px 14px; }
@@ -1955,7 +1955,7 @@ select:focus {
   .inline-form, .inline-form.compact { grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); padding: 12px 14px; }
 }
 
-@media screen and (min-width: 981px) and (max-width: 1440px), screen and (min-width: 981px) and (max-height: 800px) {
+@media screen and (min-width: 981px) and (max-width: 1600px), screen and (min-width: 981px) and (max-height: 900px) {
   .app-shell, .app-shell.has-subnav { grid-template-columns: 204px minmax(0, 1fr); }
 }
 
@@ -1990,3 +1990,67 @@ select:focus {
 .registry-array { border: 1px solid #d4dfe6; padding: 12px; margin: 12px 0; border-radius: 8px; min-width: 0; }
 .registry-editor form > .primary { margin: 16px 8px 16px 0; }
 .registry-editor input[type=checkbox] { width: 18px; height: 18px; min-height: 18px; }
+
+/* Bound intrinsic widths before choosing a layout: long selects, forms and
+   toolbar labels must not widen the application beyond the browser window. */
+.main, .content, .topbar-main, .topbar-actions, .stack,
+.master-detail, .master-detail > *, .panel, .panel-header,
+.toolbar, .detail-hero > div, .detail-grid > *, .detail-form > *,
+.inline-form > *, .registry-editor, .registry-editor label {
+  min-width: 0;
+}
+.content { container-type: inline-size; }
+.detail-grid, .detail-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.detail-grid strong, .detail-hero h3 { overflow-wrap: anywhere; }
+input, select, textarea { min-width: 0; max-width: 100%; }
+.registry-editor fieldset { min-width: 0; }
+.panel-header { flex-wrap: wrap; }
+.toolbar { max-width: 100%; }
+.toolbar .search-box { min-width: 0; max-width: 100%; }
+.avatar { flex-shrink: 0; }
+
+/* Keep navigation and account controls on separate rows at every desktop size. */
+@media screen and (min-width: 641px) {
+  .topbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 12px;
+  }
+  .topbar-main { display: contents; }
+  .breadcrumb-line { display: none; }
+  .section-switcher { grid-column: 1; grid-row: 1; }
+  .topbar-actions { grid-column: 2; grid-row: 1; flex-wrap: wrap; justify-content: flex-end; }
+  .topbar-actions .active-school-switcher { width: min(240px, 100%); min-width: 0; }
+  .main-tabs {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+  .main-tabs button { white-space: normal; }
+  .page-title { grid-column: 1 / -1; grid-row: 3; min-width: 0; }
+  .topbar p { grid-column: 1 / -1; grid-row: 4; margin: 0; }
+}
+
+/* Respond to the space actually available after the sidebar, not monitor size. */
+@container (max-width: 1350px) {
+  .master-detail { grid-template-columns: minmax(0, 1fr) minmax(300px, 0.5fr); gap: 14px; }
+  .master-detail th, .master-detail td { padding: 10px; font-size: 12px; }
+  .master-detail table { min-width: 660px; }
+}
+@container (max-width: 1100px) {
+  .master-detail { grid-template-columns: minmax(0, 1fr); }
+}
+@media screen and (max-width: 640px) {
+  .detail-grid, .detail-form { grid-template-columns: minmax(0, 1fr); }
+  .topbar-actions { flex-wrap: wrap; }
+  .active-school-switcher { width: 100%; min-width: 0; }
+  .topbar-actions .user-chip { flex-basis: 180px; }
+}
+@media screen and (max-width: 980px) {
+  .app-shell, .app-shell.has-subnav { grid-template-columns: minmax(0, 1fr); }
+  .sidebar { min-width: 0; }
+}
