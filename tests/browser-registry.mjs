@@ -11,8 +11,8 @@ const { chromium } = await import("playwright-core");
 const root = resolve(dirname(fileURLToPath(import.meta.url)), ".."),
   out = join(tmpdir(), "skolehr-browser-ematica");
 await mkdir(out, { recursive: true });
-const entry = `import React,{useState} from 'react';import{createRoot}from'react-dom/client';import{SchoolRegistryEditor,StaffRegistryEditor}from'${root}/src/components/registry/RegistryEditors.jsx';import StudentEducationEditor from'${root}/src/components/registry/StudentEducationEditor.jsx';import ClassDetailsEditor from'${root}/src/components/registry/ClassDetailsEditor.jsx';window.__calls=[];function App(){const[mode,setMode]=useState('school');return <main className="workspace"><nav>{['school','staff','student','class'].map(x=><button key={x} onClick={()=>setMode(x)}>{x}</button>)}</nav>{mode==='school'?<SchoolRegistryEditor school={{id:'a',name:'Ogledna škola A',type:'SECONDARY',oib:'12345678901'}} onClose={()=>{}}/>:mode==='staff'?<StaffRegistryEditor profile={{id:'teacher',school_id:'a',name:'Ogledni Nastavnik'}} onClose={()=>{}}/>:mode==='student'?<StudentEducationEditor studentId="student"/>:<ClassDetailsEditor classes={[{class_id:'class-a',class_name:'3.A',school_name:'Ogledna škola A',school_year_label:'2026./2027.'}]}/>}</main>}createRoot(document.getElementById('root')).render(<App/>);`;
-const mock = `const result=(data)=>Promise.resolve({data,error:null});export const supabase={from(table){const data=table==='subjects'?[{id:'math',name:'Matematika'}]:table==='classes'?{id:'class-a',variant:'REGULAR'}:[];const q={select(){return q},eq(){return q},order(){return q},single(){return q},then(a,b){return result(data).then(a,b)}};return q},rpc:async(name,args)=>{window.__calls.push({name,args});const e={id:'enrollment',student_id:'profile',registry_student_id:'student',school_id:'a',year_name:'2026./2027.',class_name:'3.A',status:'ACTIVE',school_year_id:'year',education_details:{},program_name:'Program'};let data=null;if(name==='registry_global_admin')data=true;else if(name==='registry_attestation_settings')data={};else if(name==='registry_student_enrollments')data=[e];else if(name==='registry_special_exams')data=[];else if(name==='registry_program_targets')data={schools:[{id:'a',name:'Ogledna škola A'},{id:'b',name:'Umjetnička škola B'}],classes:[{id:'class-b',name:'1.A',school_year:'2026./2027.'}],programs:[{id:'art',name:'Glazbeni program'}]};return {data,error:null}}};`;
+const entry = `import React,{useState} from 'react';import{createRoot}from'react-dom/client';import{SchoolRegistryEditor,StaffRegistryEditor}from'${root}/src/components/registry/RegistryEditors.jsx';import StudentEducationEditor from'${root}/src/components/registry/StudentEducationEditor.jsx';import ClassDetailsEditor from'${root}/src/components/registry/ClassDetailsEditor.jsx';window.__calls=[];function App(){const[mode,setMode]=useState('school');return <main className="workspace"><nav>{['school','approval','staff','student','class'].map(x=><button key={x} onClick={()=>setMode(x)}>{x}</button>)}</nav>{mode==='school'?<SchoolRegistryEditor school={{id:'a',name:'Ogledna škola A',type:'SECONDARY',oib:'12345678901'}} onClose={()=>{}}/>:mode==='approval'?<SchoolRegistryEditor school={{id:'a',name:'Ogledna škola A',type:'SECONDARY'}} key="approval" initialSection="CERTIFICATES" onClose={()=>{}}/>:mode==='staff'?<StaffRegistryEditor profile={{id:'teacher',school_id:'a',name:'Ogledni Nastavnik'}} onClose={()=>{}}/>:mode==='student'?<StudentEducationEditor studentId="student"/>:<ClassDetailsEditor classes={[{class_id:'class-a',class_name:'3.A',school_name:'Ogledna škola A',school_year_label:'2026./2027.'}]}/>}</main>}createRoot(document.getElementById('root')).render(<App/>);`;
+const mock = `const result=(data)=>Promise.resolve({data,error:null});export const supabase={from(table){const data=table==='subjects'?[{id:'math',name:'Matematika'}]:table==='classes'?{id:'class-a',variant:'REGULAR'}:[];const q={select(){return q},eq(){return q},order(){return q},single(){return q},then(a,b){return (table==='school_registry_sections'&&window.__sectionFail?Promise.resolve({data:null,error:{message:'Matične kartice nisu dostupne'}}):result(data)).then(a,b)}};return q},rpc:async(name,args)=>{window.__calls.push({name,args});const e={id:'enrollment',student_id:'profile',registry_student_id:'student',school_id:'a',year_name:'2026./2027.',class_name:'3.A',status:'ACTIVE',school_year_id:'year',education_details:{},program_name:'Program'};let data=null;if(name==='registry_global_admin')data=true;else if(name==='registry_attestation_settings'){if(window.__attestationFail)return {data:null,error:{message:'Nemate ovlasti za ustanovu.'}};if(args._approve!==undefined){if(window.__approvalFail)return {data:null,error:{message:'Odobrenje nije dopušteno.'}};window.__settings={...window.__settings,attestation_authorized:args._approve}}data=window.__settings||{}}else if(name==='registry_student_enrollments')data=[e];else if(name==='registry_special_exams')data=[];else if(name==='registry_program_targets')data={schools:[{id:'a',name:'Ogledna škola A'},{id:'b',name:'Umjetnička škola B'}],classes:[{id:'class-b',name:'1.A',school_year:'2026./2027.'}],programs:[{id:'art',name:'Glazbeni program'}]};return {data,error:null}}};`;
 const bundle = await build({
   stdin: { contents: entry, resolveDir: root, loader: "jsx" },
   bundle: true,
@@ -111,6 +111,81 @@ try {
     });
   }
   await page.setViewportSize({ width: 1366, height: 768 });
+  // Approval remains available when unrelated school tabs cannot load.
+  await page.evaluate(() => {
+    window.__sectionFail = true;
+    window.__settings = {
+      signer_name: "Test Referent",
+      signature_path: "a/sign.png",
+      stamp_path: "a/stamp.png",
+      attestation_authorized: false,
+    };
+  });
+  await page.getByRole("button", { name: "approval", exact: true }).click();
+  const approval = page.getByRole("complementary", {
+    name: "Ovjera dokumenata Školske referade",
+  });
+  await approval
+    .getByRole("button", { name: "Odobri primjenu pečata i potpisa" })
+    .click();
+  await approval
+    .getByText("Primjena vizualne ovjere je odobrena.", { exact: true })
+    .waitFor();
+  assert.equal(
+    await approval
+      .getByRole("button", { name: "Odobri primjenu pečata i potpisa" })
+      .isEnabled(),
+    false,
+  );
+  await approval.getByRole("button", { name: "Opozovi odobrenje" }).click();
+  await approval
+    .getByText("Primjena vizualne ovjere je opozvana.", { exact: true })
+    .waitFor();
+  await page.evaluate(() => {
+    window.__approvalFail = true;
+  });
+  await approval
+    .getByRole("button", { name: "Odobri primjenu pečata i potpisa" })
+    .click();
+  await approval
+    .getByText("Odobrenje nije dopušteno.", { exact: true })
+    .waitFor();
+  assert.equal(
+    await approval
+      .getByRole("button", { name: "Opozovi odobrenje" })
+      .isEnabled(),
+    false,
+  );
+  await page.evaluate(() => {
+    window.__approvalFail = false;
+    window.__attestationFail = true;
+  });
+  await approval
+    .getByRole("button", { name: "Osvježi postavke ovjere" })
+    .click();
+  await approval.getByRole("alert").waitFor();
+  assert.match(await approval.getByRole("alert").innerText(), /Nemate ovlasti/);
+  await page.evaluate(() => {
+    window.__attestationFail = false;
+    window.__sectionFail = false;
+  });
+  await approval
+    .getByRole("button", { name: "Ponovi dohvat postavki" })
+    .click();
+  await approval
+    .getByRole("button", { name: "Odobri primjenu pečata i potpisa" })
+    .waitFor();
+  const approvals = await page.evaluate(() =>
+    window.__calls.filter(
+      (x) =>
+        x.name === "registry_attestation_settings" &&
+        x.args._approve !== undefined,
+    ),
+  );
+  assert(approvals.every((x) => x.args._school === "a"));
+  assert(approvals.some((x) => x.args._approve === true));
+  assert(approvals.some((x) => x.args._approve === false));
+
   await page.getByRole("button", { name: "student", exact: true }).click();
   await page
     .getByLabel("Status školovanja", { exact: false })
@@ -175,6 +250,7 @@ try {
     mocked_data: true,
     checks: [
       "all nine institution tabs",
+      "direct approval tab, scoped approve/revoke, visible errors and retry without unrelated school data",
       "school form saves selected institution",
       "preschool forms hidden in secondary school",
       "verified status linked to exact enrollment",

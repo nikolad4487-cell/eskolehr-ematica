@@ -254,8 +254,15 @@ function Table({ rows, columns }) {
     </div>
   );
 }
-export function SchoolRegistryEditor({ school, onClose }) {
-  const [tab, setTab] = useState("BASIC"),
+export function SchoolRegistryEditor({
+  school,
+  onClose,
+  initialSection = "BASIC",
+}) {
+  const startSection = SECTIONS.some(([id]) => id === initialSection)
+    ? initialSection
+    : "BASIC";
+  const [tab, setTab] = useState(startSection),
     [data, setData] = useState({}),
     [sections, setSections] = useState([]),
     [programs, setPrograms] = useState([]),
@@ -298,17 +305,21 @@ export function SchoolRegistryEditor({ school, onClose }) {
       setGlobal(Boolean(g.data));
       setReady(!s.error && !g.error);
       setData({
-        phone: school.phone || "",
-        email: school.email || "",
-        website: school.website || "",
-        ...((s.data || []).find((x) => x.section === "BASIC")?.data || {}),
+        ...(startSection === "BASIC"
+          ? {
+              phone: school.phone || "",
+              email: school.email || "",
+              website: school.website || "",
+            }
+          : {}),
+        ...((s.data || []).find((x) => x.section === startSection)?.data || {}),
       });
-      setTab("BASIC");
+      setTab(startSection);
     });
     return () => {
       alive = false;
     };
-  }, [school.id]);
+  }, [school.id, startSection]);
   const choose = (t) => {
     setTab(t);
     setData({
@@ -391,6 +402,9 @@ export function SchoolRegistryEditor({ school, onClose }) {
           Šifra: {school.code || "—"} · OIB: {school.oib || "—"} ·{" "}
           {school.city || "—"}
         </p>
+        {tab === "CERTIFICATES" && (
+          <AttestationAuthorization schoolId={school.id} />
+        )}
         {message && (
           <p className="notice" role="status">
             {message}
@@ -415,9 +429,6 @@ export function SchoolRegistryEditor({ school, onClose }) {
           />
         ) : (
           <form onSubmit={save}>
-            {tab === "CERTIFICATES" && (
-              <AttestationAuthorization schoolId={school.id} />
-            )}
             {tab === "FOUNDATION" &&
               /(vrti|predškol|predskol|kindergarten)/i.test(
                 `${school.type || ""} ${school.subtype || ""}`,
