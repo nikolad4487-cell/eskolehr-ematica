@@ -30,7 +30,7 @@ export default function CreateSchoolUserForm({ schools, adminScope = {}, onCreat
       <label>Prezime<input name="surname" value={form.surname} onChange={change} autoComplete="family-name" required /></label>
       <label>E-mail ili korisničko ime<input name="email" value={form.email} onChange={change} autoComplete="off" required /></label>
       <label>Uloga<select aria-label="Uloga" name="role" value={form.role} onChange={change}>
-        <option value="TEACHER">Nastavnik</option><option value="REGISTRAR">Školska referada</option><option value="SCHOOL_ADMIN">Administrator škole</option>
+        <option value="TEACHER">Nastavnik</option><option value="EXPERT">Stručni suradnik</option><option value="REGISTRAR">Školska referada</option><option value="SCHOOL_ADMIN">Administrator škole</option>
       </select></label>
       <label>Privremena lozinka<input name="password" type="password" minLength={6} value={form.password} onChange={change} autoComplete="new-password" required /></label>
       <label>Početni PIN za e-Dnevnik i referadu<input name="pin" type="password" inputMode="numeric" pattern="\d{4}" minLength={4} maxLength={4} value={form.pin} onChange={change} autoComplete="off" required /></label>
