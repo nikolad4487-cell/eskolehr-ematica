@@ -1,5 +1,6 @@
 import ActiveSchoolSwitcher from './components/registry/ActiveSchoolSwitcher';
 import BulkEnrollment from './components/registry/BulkEnrollment';
+import BulkSchoolingVerification from './components/registry/BulkSchoolingVerification';
 import ControlledYearTransition from './components/registry/ControlledYearTransition';
 import { SchoolPermissions, LinkExistingStaff } from './components/registry/SchoolPermissions';
 import { downloadRows } from './lib/exportData.mjs';
@@ -1178,7 +1179,7 @@ function App() {
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'students' && <Students scopeProfile={profile} isAdmin={isAdmin} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'users' && <StaffDirectory adminScope={adminScope} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'textbooks' && <ExtendedAdminModule type="textbooks" />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'enrollments' && <Enrollments />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'enrollments' && <Enrollments isAdmin={isAdmin} adminScope={adminScope} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin && activePage === 'education-records' && <ExtendedAdminModule type="education-records" adminScope={adminScope} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'admissions' && <AdmissionsModule track={admissionsTrack} profile={profile} session={session} access={access} isStudent={false} isManager />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && activePage === 'transfers' && <Transfers />}
@@ -5646,7 +5647,7 @@ function applyStudentEducationFlagRules(edit, student = null) {
   };
 }
 
-function Enrollments() {
+function Enrollments({ isAdmin = false, adminScope = {} }) {
   const classes = useSupabaseQuery(() => supabase.from('v_ematica_class_summary').select('*').order('class_name'), []);
   const students = useSupabaseQuery(() => supabase.from('v_ematica_students_current').select('*').order('full_name'), []);
   const enrollments = useSupabaseQuery(() => supabase.from('v_student_class_enrollments_detailed').select('*').order('school_year_label', { ascending: false }).order('class_name').order('full_name'), []);
@@ -5724,6 +5725,7 @@ function Enrollments() {
 
   return (
     <div className="stack">
+      {isAdmin && <BulkSchoolingVerification key={adminScope.schoolId} adminScope={adminScope} />}
       <BulkEnrollment students={unassignedStudents} classes={classes.data} onSaved={()=>{students.reload();enrollments.reload();classes.reload()}}/>
       <Panel title="Upis učenika u razred">
         <form className="inline-form compact" onSubmit={enroll}>
