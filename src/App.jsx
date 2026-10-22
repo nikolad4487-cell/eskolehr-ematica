@@ -1,3 +1,5 @@
+import YearClosure from './components/registry/YearClosure';
+import WorkflowOverview from './components/registry/WorkflowOverview';
 import ExpertWorkspace from './components/registry/ExpertWorkspace';
 import ActiveSchoolSwitcher from './components/registry/ActiveSchoolSwitcher';
 import BulkEnrollment from './components/registry/BulkEnrollment';
@@ -58,6 +60,8 @@ const EMATICA_NAV_ITEMS = [
   { id: 'sync', label: 'Sinkronizacija e-Dnevnik', icon: Database },
   { id: 'documents', label: 'Potvrde i isprave', icon: FileText },
   { id: 'certificates', label: 'Zaključivanje i svjedodžbe', icon: FileText },
+  { id: 'history', label: 'Povijest promjena', icon: FileText },
+  { id: 'tasks', label: 'Zadaci za obradu', icon: ClipboardList },
   { id: 'reports', label: 'Izvještaji', icon: ClipboardList },
   { id: 'exports', label: 'Izvoz podataka', icon: Download },
   { id: 'help', label: 'Pomoć', icon: ShieldAlert },
@@ -118,7 +122,7 @@ const EMATICA_NAV_GROUPS = [
     id: 'reports',
     label: 'Izvješća',
     icon: FileText,
-    items: ['reports', 'documents', 'certificates'],
+    items: ['reports', 'documents', 'certificates', 'history', 'tasks'],
   },
   {
     id: 'import-export',
@@ -712,6 +716,12 @@ function App() {
   }, [session?.user?.id]);
 
   const isPrincipal = Boolean(access?.is_principal || String(profile?.role).toUpperCase() === 'PRINCIPAL');
+  const selectObserverSchool=async id=>{
+    const result=await supabase.from('user_profiles').update({active_school_id:id}).eq('id',profile.id);
+    if(result.error)throw new Error('Aktivnu školu nije moguće promijeniti. Provjerite aktivaciju nadogradnje radnih tijekova.');
+    const nextProfile={...profile,active_school_id:id},nextAccess={...access,active_school_id:id};
+    setProfile(nextProfile);setAccess(nextAccess);writeSessionValue(SESSION_KEYS.profile,nextProfile);writeSessionValue(SESSION_KEYS.access,nextAccess);
+  };
   const isExpert = Boolean(access?.is_expert || String(profile?.role).toUpperCase() === 'EXPERT');
   const isStudent = !isExpert && !isPrincipal && (access?.is_student || isStudentProfile(profile));
   const isTeacher = isTeacherProfile(profile, access);
@@ -992,7 +1002,7 @@ function App() {
     ? EMATICA_NAV_ITEMS
     : EMATICA_NAV_ITEMS.filter((item) => item.id !== 'access');
   const navItems = activeSection === APP_SECTIONS.ematica.id
-    ? (canUseEmaticaInApp ? (isPrincipal ? [{id:'principal',label:'Pregled ravnatelja',icon:BookOpen}] : isExpert ? [{id:'expert',label:'Stručna služba',icon:BookOpen}] : isAdmin ? adminNavItems : HOMEROOM_NAV_ITEMS) : LOCKED_NAV_ITEMS)
+    ? (canUseEmaticaInApp ? (isPrincipal ? [{id:'principal',label:'Pregled ravnatelja',icon:BookOpen},{id:'history',label:'Povijest promjena',icon:FileText}] : isExpert ? [{id:'expert',label:'Stručna služba',icon:BookOpen}] : isAdmin ? adminNavItems : HOMEROOM_NAV_ITEMS) : LOCKED_NAV_ITEMS)
     : (canUseActiveAdmissionsSection ? admissionsNavItems : LOCKED_NAV_ITEMS);
   const groupedNavigation = activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isAdmin
     ? EMATICA_NAV_GROUPS
@@ -1176,8 +1186,11 @@ function App() {
         </header>
 
         <section className="content">
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isExpert && <ExpertWorkspace />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isPrincipal && <ExpertWorkspace readOnly />}
+          {activeSection === APP_SECTIONS.ematica.id && (isAdmin || isPrincipal) && activePage === 'history' && <WorkflowOverview schoolId={adminScope.schoolId} history />}
+          {activeSection === APP_SECTIONS.ematica.id && isAdmin && activePage === 'tasks' && <WorkflowOverview schoolId={adminScope.schoolId} />}
+
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isExpert && <ExpertWorkspace initialSchoolId={adminScope.schoolId} onSchoolChange={selectObserverSchool} />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isPrincipal && activePage !== 'history' && <ExpertWorkspace readOnly initialSchoolId={adminScope.schoolId} onSchoolChange={selectObserverSchool} />}
           {activeSection === APP_SECTIONS.ematica.id && !canUseEmaticaInApp && !isExpert && !isPrincipal && activePage === 'locked' && <AccessLocked section={activeSection} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && !isPrincipal && activePage === 'dashboard' && (isAdmin ? <Dashboard onNavigate={setActivePage} isSuperAdmin={isSuperAdmin} /> : <HomeroomDashboard profile={profile} />)}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && !isPrincipal && isAdmin && activePage === 'schools' && <Schools adminScope={adminScope} />}
@@ -1194,7 +1207,7 @@ function App() {
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && !isPrincipal && activePage === 'transfers' && <Transfers />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && !isPrincipal && isAdmin && activePage === 'weekly-assignments' && <ExtendedAdminModule type="weekly-assignments" adminScope={adminScope} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && !isPrincipal && isAdmin && activePage === 'transport' && <ExtendedAdminModule type="transport" adminScope={adminScope} />}
-          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && !isPrincipal && activePage === 'transition' && <YearTransition />}
+          {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && !isPrincipal && activePage === 'transition' && <YearTransition schoolId={adminScope.schoolId} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && !isPrincipal && activePage === 'sync' && <EdnevnikSync />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && !isPrincipal && isAdmin && activePage === 'documents' && <DocumentArchive />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && !isExpert && !isPrincipal && activePage === 'certificates' && <YearEndCertificates scopeProfile={profile} isAdmin={isAdmin} />}
@@ -5964,7 +5977,7 @@ function Transfers() {
   );
 }
 
-function YearTransition() {
+function YearTransition({schoolId}) {
   const candidates = useSupabaseQuery(() => supabase.from('v_ematica_transition_candidates').select('*').order('from_class_name'), []);
   const years = useSupabaseQuery(() => supabase.from('school_years').select('id,label,name').order('label'), []);
   const students = useSupabaseQuery(() => supabase.from('v_ematica_students_current').select('*').order('full_name'), []);
@@ -6050,6 +6063,7 @@ function YearTransition() {
 
   return (
     <div className="stack">
+      <YearClosure schoolId={schoolId} />
       <ControlledYearTransition classes={classes.data} onSaved={()=>{candidates.reload();students.reload();classes.reload()}}/>
       <Panel title="Pokretanje prijelaza">
         <div className="inline-form">
