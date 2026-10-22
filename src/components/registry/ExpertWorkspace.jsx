@@ -3,7 +3,7 @@ import PrincipalStudentRecords from './PrincipalStudentRecords';
 import { supabase } from '../../lib/supabase';
 
 const profileFields = { education_program: 'Obrazovni program (pedagoški karton)', visit_reason: 'Razlog posjeta', disabilities: 'Teškoće učenika', accommodations: 'Prilagodbe', support_types: 'Vrste podrške', practical_training: 'Praktična nastava — pedagoška bilješka', documentation: 'Dokumentacija' };
-export default function ExpertWorkspace({ readOnly = false }) {
+export default function ExpertWorkspace({ readOnly = false, initialSchoolId, onSchoolChange }) {
   const [context, setContext] = useState({ schools: [], classes: [], students: [], subjects: [] });
   const [school, setSchool] = useState(''), [year, setYear] = useState(''), [classId, setClassId] = useState(''), [student, setStudent] = useState('');
   const [profile, setProfile] = useState(null), [notes, setNotes] = useState(null), [message, setMessage] = useState(''), [busy, setBusy] = useState(false);
@@ -11,7 +11,7 @@ export default function ExpertWorkspace({ readOnly = false }) {
   const load = async () => {
     const r = await supabase.rpc('expert_workspace');
     if (r.error) { setMessage(r.error.message); return; }
-    setContext(r.data); setLoaded(true); setSchool(current => r.data.schools.some(s => s.id === current) ? current : r.data.schools[0]?.id || '');
+    setContext(r.data); setLoaded(true); setSchool(current => r.data.schools.some(s => s.id === current) ? current : r.data.schools.find(s=>s.id===initialSchoolId)?.id || r.data.schools[0]?.id || '');
   };
   useEffect(() => { load(); }, []);
   useEffect(() => { setYear(''); setClassId(''); setStudent(''); setProfile(null); setNotes(null); }, [school]);
@@ -57,7 +57,7 @@ export default function ExpertWorkspace({ readOnly = false }) {
       {message && <p className="notice" role="status">{message}</p>}
       {!loaded && <button onClick={load}>Ponovi učitavanje stručne službe</button>}
       <fieldset disabled={busy} className="user-create-fields">
-        <label>Škola<select aria-label={readOnly ? 'Škola ravnatelja' : 'Škola stručnog suradnika'} value={school} onChange={e => setSchool(e.target.value)}>{context.schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+        <label>Škola<select aria-label={readOnly ? 'Škola ravnatelja' : 'Škola stručnog suradnika'} value={school} onChange={async e => {const id=e.target.value;try{if(onSchoolChange)await onSchoolChange(id);setSchool(id);}catch(error){setMessage(error.message);}}}>{context.schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
         <label>Školska godina<select aria-label={readOnly ? 'Školska godina ravnatelja' : 'Školska godina stručnog suradnika'} value={year} onChange={e => { setYear(e.target.value); setClassId(''); }}><option value="">Sve godine</option>{years.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>
         <label>Razred<select aria-label={readOnly ? 'Razred ravnatelja' : 'Razred stručnog suradnika'} value={classId} onChange={e => setClassId(e.target.value)}><option value="">Odaberite razred</option>{context.classes.filter(c => c.school_id === school && (!year || c.school_year_id === year)).map(c => <option key={c.id} value={c.id}>{c.name} — {c.year}</option>)}</select></label>
         <label>Učenik<select aria-label={readOnly ? 'Učenik ravnatelja' : 'Učenik stručnog suradnika'} value={student} onChange={e => setStudent(e.target.value)}><option value="">Odaberite učenika</option>{[...new Map(context.students.map(s => [s.id, s])).values()].map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
