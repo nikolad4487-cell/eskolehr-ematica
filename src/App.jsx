@@ -1,3 +1,4 @@
+import DataQuality from './components/registry/DataQuality';
 import YearClosure from './components/registry/YearClosure';
 import WorkflowOverview from './components/registry/WorkflowOverview';
 import ExpertWorkspace from './components/registry/ExpertWorkspace';
@@ -61,7 +62,7 @@ const EMATICA_NAV_ITEMS = [
   { id: 'documents', label: 'Potvrde i isprave', icon: FileText },
   { id: 'certificates', label: 'Zaključivanje i svjedodžbe', icon: FileText },
   { id: 'history', label: 'Povijest promjena', icon: FileText },
-  { id: 'tasks', label: 'Zadaci za obradu', icon: ClipboardList },
+  { id: 'tasks', label: 'Zadaci i potpunost podataka', icon: ClipboardList },
   { id: 'reports', label: 'Izvještaji', icon: ClipboardList },
   { id: 'exports', label: 'Izvoz podataka', icon: Download },
   { id: 'help', label: 'Pomoć', icon: ShieldAlert },
@@ -1187,7 +1188,7 @@ function App() {
 
         <section className="content">
           {activeSection === APP_SECTIONS.ematica.id && (isAdmin || isPrincipal) && activePage === 'history' && <WorkflowOverview schoolId={adminScope.schoolId} history />}
-          {activeSection === APP_SECTIONS.ematica.id && isAdmin && activePage === 'tasks' && <WorkflowOverview schoolId={adminScope.schoolId} />}
+          {activeSection === APP_SECTIONS.ematica.id && isAdmin && activePage === 'tasks' && <><DataQuality schoolId={adminScope.schoolId} onOpen={(id)=>{window.sessionStorage.setItem(`${SESSION_PREFIX}:students:selectedStudentId`,JSON.stringify(id));setActivePage('students');}}/><WorkflowOverview schoolId={adminScope.schoolId} /></>}
 
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isExpert && <ExpertWorkspace initialSchoolId={adminScope.schoolId} onSchoolChange={selectObserverSchool} />}
           {activeSection === APP_SECTIONS.ematica.id && canUseEmaticaInApp && isPrincipal && activePage !== 'history' && <ExpertWorkspace readOnly initialSchoolId={adminScope.schoolId} onSchoolChange={selectObserverSchool} />}
