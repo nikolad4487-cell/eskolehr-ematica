@@ -1,3 +1,4 @@
+import StudentMailCredentials from './components/registry/StudentMailCredentials';
 import DataQuality from './components/registry/DataQuality';
 import YearClosure from './components/registry/YearClosure';
 import WorkflowOverview from './components/registry/WorkflowOverview';
@@ -5390,6 +5391,7 @@ function StudentDetailPanel({ student, onMessage, onRefresh, isAdmin }) {
         </div>
       </div>
 
+      {isAdmin && <StudentMailCredentials student={student} />}
       {isAdmin && <StudentEducationEditor key={student.registry_student_id} studentId={student.registry_student_id} />}
 
       <form className="detail-form" onSubmit={save}>
