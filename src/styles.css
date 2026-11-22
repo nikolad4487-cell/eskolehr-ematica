@@ -2090,3 +2090,4 @@ input, select, textarea { min-width: 0; max-width: 100%; }
 }
 .user-create-fields input[type="checkbox"] { width: 18px; height: 18px; min-height: 18px; padding: 0; }
 .staff-table .status-badge { justify-self: start; }
+.staff-table .status-badge { white-space: nowrap; padding-inline: 8px; }
