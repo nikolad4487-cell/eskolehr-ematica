@@ -1,6 +1,6 @@
 export async function createSchoolUser(client, values, send = fetch) {
   if (!values.schoolId) throw new Error('Odaberite školu.');
-  if (typeof values.password !== 'string' || values.password.length < 6) throw new Error('Lozinka mora sadržavati najmanje 6 znakova.');
+  if (!values.electronicIdentity && (typeof values.password !== 'string' || values.password.length < 6)) throw new Error('Lozinka mora sadržavati najmanje 6 znakova.');
   if (!/^\d{4}$/.test(values.pin ?? '1234')) throw new Error('Početni PIN mora imati točno 4 znamenke.');
   const { data, error } = await client.auth.getSession();
   if (error || !data.session) throw new Error('Prijava je istekla. Prijavite se ponovno.');
@@ -14,7 +14,7 @@ export async function createSchoolUser(client, values, send = fetch) {
       signal: controller.signal,
     });
     const result = await response.json();
-    if (!response.ok || !result.success) throw new Error(result.error || 'Korisnika nije moguće stvoriti.');
+    if (!response.ok || !result.success) {const error=new Error(result.error || 'Korisnika nije moguće stvoriti.');error.createdProfileId=result.createdProfileId;throw error;}
     return result;
   } catch (error) {
     if (error.name === 'AbortError') throw new Error('Spremanje traje predugo. Osvježite popis korisnika i provjerite je li račun stvoren prije ponovnog pokušaja.');
