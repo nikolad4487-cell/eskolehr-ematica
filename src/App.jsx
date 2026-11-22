@@ -1,3 +1,4 @@
+import ElectronicIdentity from './components/ElectronicIdentity';
 import DataQuality from './components/registry/DataQuality';
 import YearClosure from './components/registry/YearClosure';
 import WorkflowOverview from './components/registry/WorkflowOverview';
@@ -3926,6 +3927,8 @@ function StaffDirectory({ adminScope = {} }) {
   });
   const [message, setMessage] = useState('');
   const [registryProfile, setRegistryProfile] = useState(null);
+  const [identityProfile,setIdentityProfile]=useState(null);
+  useEffect(()=>setIdentityProfile(null),[schoolId,adminScope.schoolId]);
   const [permissionsProfile, setPermissionsProfile] = useState(null);
 
   useEffect(() => {
@@ -4053,6 +4056,7 @@ function StaffDirectory({ adminScope = {} }) {
 
   return (
     <div className="stack">
+      {identityProfile&&<ElectronicIdentity key={identityProfile.id+identityProfile.school_id} profileId={identityProfile.id} schoolId={identityProfile.school_id} onClose={()=>setIdentityProfile(null)}/>}
       {registryProfile && <StaffRegistryEditor key={`${registryProfile.id}:${registryProfile.school_id}`} profile={registryProfile} onClose={() => setRegistryProfile(null)} />}
       <LinkExistingStaff schoolId={adminScope.isScoped?adminScope.schoolId:schoolId} onSaved={roles.reload}/>
       {permissionsProfile&&<SchoolPermissions profile={permissionsProfile} onSaved={roles.reload} onClose={()=>setPermissionsProfile(null)}/>}
@@ -4115,6 +4119,7 @@ function StaffDirectory({ adminScope = {} }) {
               <div className="row-actions" key={`${profile.id}-${profile.school_id}-actions`}>
                 <button className="small-button" type="button" onClick={() => startEdit(profile)}>Uredi</button>
                 <button className="small-button" type="button" onClick={() => setRegistryProfile(profile)}>Radni i obrazovni podaci</button>
+                {profile.roles.some(r=>["TEACHER","HOMEROOM","HOMEROOM_TEACHER","DEPUTY"].includes(r))&&<button className="small-button" type="button" onClick={()=>setIdentityProfile(profile)}>Elektronički identitet / nova lozinka</button>}
                 <button className="small-button" type="button" onClick={() => setPermissionsProfile(profile)}>Prava u ustanovi</button>
                 <button className="small-button danger" type="button" onClick={() => deleteFromInstitution(profile)}>Obriši</button>
               </div>,
@@ -5346,6 +5351,7 @@ function StudentDetailPanel({ student, onMessage, onRefresh, isAdmin }) {
 
   return (
     <Panel title="Profil učenika">
+      {isAdmin&&student.ednevnik_student_id&&student.school_id&&<ElectronicIdentity key={student.ednevnik_student_id+student.school_id} profileId={student.ednevnik_student_id} schoolId={student.school_id} schoolYearId={student.school_year_id}/>}
       <div className="detail-hero">
         {student.photo_url ? (
           <img className="avatar photo" src={student.photo_url} alt={student.full_name} />
