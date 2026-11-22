@@ -4103,7 +4103,7 @@ function StaffDirectory({ adminScope = {} }) {
           <p className="notice">Prikazuju se samo korisnici ustanove {adminScope.schoolName || adminScope.schoolId}.</p>
         )}
         <DataState state={roles}>
-          <Table
+          <Table className="staff-table"
             columns={['Prezime i ime', 'E-mail', 'OIB', 'Ustanova', 'Uloge', 'Status', 'Akcije']}
             rows={staff.map((profile) => [
               getProfileDisplayName(profile),
@@ -6413,9 +6413,9 @@ function ApplicationStatusBadge({ value }) {
   return <span className={`status-badge application-${tone}`}>{labels[value] ?? value ?? '-'}</span>;
 }
 
-function Table({ columns, rows }) {
+function Table({ columns, rows, className = '' }) {
   return (
-    <div className="table-wrap">
+    <div className={`table-wrap ${className}`} tabIndex={0} role="region" aria-label="Tablica podataka">
       <table>
         <thead>
           <tr>{columns.map((column) => <th key={column}>{column}</th>)}</tr>
@@ -6424,7 +6424,7 @@ function Table({ columns, rows }) {
           {rows.length === 0 ? (
             <tr><td colSpan={columns.length} className="empty">Nema podataka</td></tr>
           ) : rows.map((row, index) => (
-            <tr key={index}>{row.map((cell, cellIndex) => <td key={cellIndex}>{cell ?? '-'}</td>)}</tr>
+            <tr key={index}>{row.map((cell, cellIndex) => <td key={cellIndex} data-label={columns[cellIndex]}>{cell ?? '-'}</td>)}</tr>
           ))}
         </tbody>
       </table>
