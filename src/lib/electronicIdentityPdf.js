@@ -30,9 +30,9 @@ export async function electronicIdentityPdf(issued,loadFont=async name=>{
   page.drawText(valueText,{x:px*s,y:841.89-py*s,font,size:pt,color:black});
  };
  const line=(y,dark=false)=>page.drawLine({start:{x:74*s,y:841.89-y*s},end:{x:1259*s,y:841.89-y*s},thickness:(dark?6:1)*s,color:rgb(dark?.27:.63,dark?.27:.63,dark?.27:.63)});
- text('ŠKOLEHR.XYZ',114,144,sans,44);
+ text('CARNet',114,144,sans,44);
  text('PODACI O ELEKTRONIČKOM IDENTITETU',585,117,bold,30,634);
- text('U SUSTAVU ŠKOLEHR.XYZ',825,153,bold,30,394);line(198,true);
+ text('U SUSTAVU AAI@EduHr',825,153,bold,30,394);line(198,true);
  const rows=[['Ime i prezime',x.name,284],['OIB',x.oib,329],['Identifikator korisnika u ustanovi',x.username,375],['Korisnička oznaka',x.email,420],['Lozinka',issued.password,466],['Email',x.email,547],['Datum rođenja',x.birthDate,591],['Spol',x.gender,636]];
  for(const [label,value,y] of rows){text(label,114,y,bold,24,470);text(value,608,y,regular,25,608);}
  if(x.relationship==='STUDENT')text('Za prijavu na skolehr.xyz i webmailhr.com.',608,498,italic,21,610);
