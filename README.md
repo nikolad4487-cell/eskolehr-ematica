@@ -35,3 +35,21 @@ Oba obrasca stvaraju zajednički Auth račun, profil i školsku ulogu kroz auten
 Za račun Školske referade administrator nakon stvaranja uključuje dodjelu škole u e-Dnevniku. Postojeći račun s istom e-mail adresom neće dobiti prepisanu lozinku; potrebno je urediti ili uvesti postojeći račun.
 
 Provjere: `npm run build` i `node --test tests/*.test.mjs`. Obrasci su dodatno provjereni u pregledniku s izmišljenim podacima na 1366 × 768 i 390 × 740, uključujući odabir druge škole, referadu, unos osmeroznakovne lozinke i zasebnog PIN-a.
+
+## Izdavanje nove učeničke lozinke i PDF
+
+Na kartici povezanog učenika ovlaštenom administratoru dostupan je gumb
+**Izdaj novu učeničku lozinku i preuzmi PDF**. Potvrda izdaje novu izvornu lozinku
+za e-Dnevnik i povezani WebmailHR sandučić. Postojeća lozinka se ne dohvaća.
+PDF ostaje dostupan za ponovno preuzimanje u istoj otvorenoj kartici, bez novog
+resetiranja. Izvorna škola i korisnički UUID provjeravaju se na poslužitelju;
+sama vidljivost gumba ne daje ovlasti. Nastavnički PIN i njegov postojeći obrazac
+nisu dio ove promjene.
+
+Frontend koristi `https://webmailhr.com/api/integrations/schools/student-password.pdf`
+s vlastitom Supabase korisničkom sesijom. Nakon izričitog korisnikova odobrenja
+zaštićena školska Edge integracija i WebmailHR backend objavljeni su u produkciju,
+a servisni ključevi spremljeni su samo u serverskim Production secrets.
+Privatni servisni ključ ne ulazi u ovaj frontend. Obje aplikacije imaju READY
+produkcijske objave; neautentificirano izdavanje vraća 401. Stvarnom učeniku
+nije resetirana lozinka radi testiranja.
